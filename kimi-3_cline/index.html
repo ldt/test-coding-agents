@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WORMS — 2-Player Artillery</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <h1 class="logo">WORMS</h1>
+      <p class="tagline">2-player hot-seat artillery &middot; destructible terrain &middot; wind</p>
+    </header>
+
+    <section class="stage">
+      <canvas id="game" width="960" height="540" aria-label="Worms game canvas"></canvas>
+    </section>
+
+    <section class="controls">
+      <div class="weapons" role="group" aria-label="Weapon selection">
+        <button class="wbtn" data-weapon="0" type="button">
+          <span class="wbtn-key">1</span>
+          <span class="wbtn-icon">&#128640;</span>
+          <span class="wbtn-name">Bazooka</span>
+        </button>
+        <button class="wbtn" data-weapon="1" type="button">
+          <span class="wbtn-key">2</span>
+          <span class="wbtn-icon">&#128163;</span>
+          <span class="wbtn-name">Grenade</span>
+        </button>
+        <button class="wbtn" data-weapon="2" type="button">
+          <span class="wbtn-key">3</span>
+          <span class="wbtn-icon">&#129528;</span>
+          <span class="wbtn-name">Dynamite</span>
+        </button>
+      </div>
+      <p class="help">
+        <kbd>&larr;</kbd><kbd>&rarr;</kbd> walk &nbsp;&middot;&nbsp;
+        <kbd>&uarr;</kbd><kbd>&darr;</kbd> aim &nbsp;&middot;&nbsp;
+        <kbd>Space</kbd> hold & release to fire &nbsp;&middot;&nbsp;
+        <kbd>Enter</kbd> jump &nbsp;&middot;&nbsp;
+        <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> weapon &nbsp;&middot;&nbsp;
+        <kbd>R</kbd> restart
+      </p>
+      <p class="help dim">Tip: append <code>?demo</code> to the URL to watch the game play itself.</p>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

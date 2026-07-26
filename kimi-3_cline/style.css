@@ -1,0 +1,177 @@
+/* ===== WORMS — page chrome ===== */
+
+:root {
+  --bg-0: #0b0e14;
+  --bg-1: #141a26;
+  --panel: #1a2233;
+  --panel-edge: #2b3854;
+  --ink: #dfe7f5;
+  --ink-dim: #8b98b3;
+  --worm-green: #7ac74f;
+  --worm-green-dark: #4e8a2e;
+  --accent: #ffd23f;
+  --red: #e74c3c;
+  --blue: #3498db;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1c2942 0%, var(--bg-1) 45%, var(--bg-0) 100%);
+  background-attachment: fixed;
+  display: flex;
+  justify-content: center;
+  overflow-x: hidden;
+}
+
+.page {
+  width: min(1000px, 98vw);
+  padding: 18px 12px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ---- masthead ---- */
+
+.masthead { text-align: center; user-select: none; }
+
+.logo {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 54px);
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  color: var(--worm-green);
+  text-shadow:
+    0 2px 0 var(--worm-green-dark),
+    0 4px 0 rgba(0, 0, 0, 0.45),
+    0 0 26px rgba(122, 199, 79, 0.35);
+}
+
+.tagline {
+  margin: 4px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* ---- canvas stage ---- */
+
+.stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#game {
+  width: min(960px, 96vw);
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #0a0d13;
+  border: 3px solid var(--panel-edge);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 0 42px rgba(52, 152, 219, 0.12);
+  cursor: crosshair;
+}
+
+/* ---- controls ---- */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.weapons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.wbtn {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  font: inherit;
+  color: var(--ink);
+  background: linear-gradient(180deg, #232f49, var(--panel));
+  border: 2px solid var(--panel-edge);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.06s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.wbtn:hover { transform: translateY(-1px); border-color: #3d5080; }
+.wbtn:active { transform: translateY(1px); }
+
+.wbtn.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(255, 210, 63, 0.35), inset 0 0 10px rgba(255, 210, 63, 0.12);
+}
+
+.wbtn:disabled { opacity: 0.45; cursor: default; transform: none; }
+
+.wbtn-key {
+  grid-row: 1 / 3;
+  font-size: 11px;
+  color: var(--bg-0);
+  background: var(--ink-dim);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-weight: 700;
+}
+
+.wbtn.selected .wbtn-key { background: var(--accent); }
+
+.wbtn-icon { font-size: 18px; line-height: 1; }
+.wbtn-name { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+  line-height: 2;
+}
+
+.help.dim { opacity: 0.65; font-size: 11px; }
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 1px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-bottom-width: 3px;
+  border-radius: 5px;
+}
+
+code {
+  color: var(--accent);
+  background: var(--panel);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
