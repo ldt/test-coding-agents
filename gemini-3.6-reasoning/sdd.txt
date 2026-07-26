@@ -1,0 +1,39 @@
+Software Design Document (SDD): Worms Canvas Edition
+1. System Overview
+Worms Canvas Edition is a 2D turn-based artillery tactics game rendered entirely using HTML5 Canvas and vanilla JavaScript. Two opposing teams of worms (Red Team vs. Blue Team) take turns aiming, charging shot power, and firing physics-driven projectiles across a destructible terrain to eliminate the opposing team.
+2. Architecture & Components
++-------------------------------------------------------------------+
+|                        HTML5 Canvas Window                        |
++-------------------------------------------------------------------+
+|  [ UI Overlay Layer ] - Turn Timer, Health, Wind, Weapon Menu    |
++-------------------------------------------------------------------+
+|  [ Dynamic Render Layer ] - Worms, Aim Line, Projectiles, FX      |
++-------------------------------------------------------------------+
+|  [ Destructible Terrain Layer ] - Offscreen Canvas Masking Buffer  |
++-------------------------------------------------------------------+
+|  [ Background Layer ] - Sky Gradient, Water Level, Clouds         |
++-------------------------------------------------------------------+
+
+2.1. Dual-Canvas Destructible Terrain
+• Main Canvas (1000x600): Handles overall rendering (background, entities, UI, effects).
+• Offscreen Terrain Canvas (1000x600): Stores solid ground pixel data. • Destruction Logic: Explosions draw circles onto the offscreen canvas using globalCompositeOperation = 'destination-out', carving out craters in real-time. • Collision Detection: Pixel alpha inspection (getImageData(x, y, 1, 1).data[3] > 0) determines solid ground.
+2.2. Physics Engine
+• Gravity (g = 0.25\text{ px/f}^2): Applies to falling worms and flying projectiles.
+• Wind Vector (\vec{w} \in [-0.15, 0.15]): Modifies projectile horizontal acceleration per frame.
+• Knockback Physics: Blast impulses push nearby worms away proportional to distance from the explosion center:  $$\vec{F}_{\text{impulse}} = \frac{\vec{r}_{\text{worm}} - \vec{r}_{\text{blast}}}{\Vert{}\vec{r}_{\text{worm}} - \vec{r}_{\text{blast}}\Vert{}} \cdot \left(1 - \frac{d}{R_{\text{blast}}}\right) \cdot \text{Force}$$
+3. Game Flow & State Machine
+1. TURN_START: Selects the next active worm, assigns turn duration (30s), and randomizes wind strength.
+2. PLAYER_INPUT: Player moves worm (A/D), aims (W/S), switches weapon (1/2), and charges shot (Space).
+3. PROJECTILE_FLIGHT: Projectile simulates movement, wind resistance, bouncing (grenades), or terrain impact.
+4. EXPLOSION_RESOLVE: Terrain is carved out, knockback is applied to nearby worms, and damage is calculated.
+5. PHYSICS_SETTLE: Waits for all worms to land and stop sliding/falling.
+6. CHECK_VICTORY: Checks if a team is wiped out or drowned in the water level. If both teams remain alive, loops back to TURN_START.
+4. Entity & Weapon Specifications
+Weapon	Trajectory Physics	Bounces	Blast Radius	Max Damage	Features
+Bazooka	High velocity, affected by Wind	No	35\text{px}	45 HP	Explodes on solid/worm contact
+Grenade	Bouncy, ignores Wind	Yes (e = 0.5)	50\text{px}	60 HP	3-second fuse timer
+5. Controls Mapping
+• Move Left / Right: A / D or ArrowLeft / ArrowRight
+• Aim Up / Down: W / S or ArrowUp / ArrowDown
+• Charge & Fire: Hold and release Space
+• Select Weapon: 1 (Bazooka), 2 (Grenade)

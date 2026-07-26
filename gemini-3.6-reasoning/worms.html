@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worms Canvas Edition</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111827;
+            color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #374151;
+            background: #000;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: none;
+        }
+        .team-hud {
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            gap: 15px;
+        }
+        .team-red { color: #ef4444; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .team-blue { color: #3b82f6; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        #turn-info {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+        }
+        #controls-hint {
+            margin-top: 12px;
+            background: #1f2937;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #9ca3af;
+            border: 1px solid #374151;
+            display: flex;
+            gap: 15px;
+        }
+        #controls-hint span {
+            color: #f3f4f6;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-bar">
+        <div id="red-hud" class="team-hud team-red">RED TEAM</div>
+        <div id="turn-info">WARMING UP...</div>
+        <div id="blue-hud" class="team-hud team-blue">BLUE TEAM</div>
+    </div>
+    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+</div>
+
+<div id="controls-hint">
+    <div><span>A / D</span> Walk</div>
+    <div><span>W / S</span> Aim Angle</div>
+    <div><span>Hold Space</span> Charge Power</div>
+    <div><span>1 / 2</span> Switch Weapon (1: Bazooka, 2: Grenade)</div>
+</div>
+
+<script>
+// --- CONSTANTS & SETUP ---
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 600;
+const WATER_LEVEL = 550;
+const GRAVITY = 0.22;
+
+const mainCanvas = document.getElementById('gameCanvas');
+const ctx = mainCanvas.getContext('2d');
+
+// Offscreen canvas for destructible terrain
+const terrainCanvas = document.createElement('canvas');
+terrainCanvas.width = CANVAS_WIDTH;
+terrainCanvas.height = CANVAS_HEIGHT;
+const terrainCtx = terrainCanvas.getContext('2d');
+
+// State Machine
+const GAME_STATES = {
+    PLAYER_TURN: 'PLAYER_TURN',
+    PROJECTILE_IN_FLIGHT: 'PROJECTILE_IN_FLIGHT',
+    RESOLVING: 'RESOLVING',
+    GAME_OVER: 'GAME_OVER'
+};
+
+let gameState = GAME_STATES.PLAYER_TURN;
+let currentTeam = 'red'; // 'red' or 'blue'
+let turnTimer = 30;
+let turnTimerInterval = null;
+let wind = 0; // -0.15 to +0.15
+
+const keys = {};
+let power = 0;
+let isCharging = false;
+let selectedWeapon = 'bazooka'; // 'bazooka' | 'grenade'
+
+// Game Objects
+let worms = [];
+let activeWormIndex = { red: 0, blue: 0 };
+let activeProjectile = null;
+let particles = [];
+let floatingTexts = [];
+
+// --- TERRAIN GENERATION ---
+function generateTerrain() {
+    terrainCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Create organic hill shapes using layered sine waves
+    terrainCtx.beginPath();
+    terrainCtx.moveTo(0, CANVAS_HEIGHT);
+
+    for (let x = 0; x <= CANVAS_WIDTH; x += 5) {
+        let y = 320
+            + Math.sin(x * 0.005) * 80
+            + Math.sin(x * 0.015) * 40
+            + Math.sin(x * 0.03) * 15;
+        terrainCtx.lineTo(x, y);
+    }
+
+    terrainCtx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT);
+    terrainCtx.closePath();
+
+    // Fill Terrain Dirt Layer
+    const dirtGradient = terrainCtx.createLinearGradient(0, 200, 0, CANVAS_HEIGHT);
+    dirtGradient.addColorStop(0, '#8b5a2b');
+    dirtGradient.addColorStop(1, '#4a2f13');
+    terrainCtx.fillStyle = dirtGradient;
+    terrainCtx.fill();
+
+    // Top Grass Layer
+    terrainCtx.lineWidth = 12;
+    terrainCtx.strokeStyle = '#22c55e';
+    terrainCtx.stroke();
+}
+
+function isSolid(x, y) {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    if (x < 0 || x >= CANVAS_WIDTH || y < 0) return false;
+    if (y >= CANVAS_HEIGHT) return true;
+    const pixel = terrainCtx.getImageData(x, y, 1, 1).data;
+    return pixel[3] > 128; // Alpha > 128 considered solid
+}
+
+function carveTerrain(x, y, radius) {
+    terrainCtx.save();
+    terrainCtx.globalCompositeOperation = 'destination-out';
+    terrainCtx.beginPath();
+    terrainCtx.arc(x, y, radius, 0, Math.PI * 2);
+    terrainCtx.fill();
+    terrainCtx.restore();
+}
+
+// --- WORM CLASS ---
+class Worm {
+    constructor(x, y, team, name) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.radius = 12;
+        this.hp = 100;
+        this.maxHp = 100;
+        this.team = team; // 'red' or 'blue'
+        this.name = name;
+        this.aimAngle = team === 'red' ? -Math.PI / 4 : -3 * Math.PI / 4;
+        this.facing = team === 'red' ? 1 : -1;
+        this.isGrounded = false;
+        this.isDead = false;
+    }
+
+    update() {
+        if (this.isDead) return;
+
+        // Gravity check
+        if (!isSolid(this.x, this.y + this.radius + 1)) {
+            this.vy += GRAVITY;
+            this.isGrounded = false;
+        } else {
+            if (!this.isGrounded) {
+                this.vy = 0;
+                this.vx *= 0.5; // Friction on landing
+                this.isGrounded = true;
+            }
+        }
+
+        // Apply velocities
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Terrain collision horizontal & slope resolution
+        if (isSolid(this.x, this.y + this.radius)) {
+            // Check if we can step up slope
+            if (!isSolid(this.x, this.y + this.radius - 4)) {
+                this.y -= 2;
+            } else {
+                this.y -= Math.max(1, Math.abs(this.vy));
+                this.vy = 0;
+            }
+        }
+
+        // Check Water Line Death
+        if (this.y > WATER_LEVEL - 5) {
+            this.takeDamage(100);
+            createExplosion(this.x, this.y, 10, 0); // Splash effect
+        }
+    }
+
+    move(dir) {
+        if (!this.isGrounded || gameState !== GAME_STATES.PLAYER_TURN) return;
+        this.facing = dir;
+        const targetX = this.x + dir * 1.5;
+        // Simple step check
+        if (!isSolid(targetX, this.y) || !isSolid(targetX, this.y - 6)) {
+            this.x += dir * 1.5;
+        }
+    }
+
+    takeDamage(amount) {
+        this.hp = Math.max(0, this.hp - amount);
+        floatingTexts.push(new FloatingText(`-${Math.round(amount)}`, this.x, this.y - 20, '#ef4444'));
+        if (this.hp === 0) {
+            this.isDead = true;
+        }
+    }
+
+    draw() {
+        if (this.isDead) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // Worm Body
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.team === 'red' ? '#f87171' : '#60a5fa';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#111827';
+        ctx.stroke();
+
+        // Eyes
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(this.facing * 4, -4, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.facing * 5, -4, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Active Worm Indicator
+        const activeWorm = getActiveWorm();
+        if (activeWorm === this && gameState === GAME_STATES.PLAYER_TURN) {
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius - 20);
+            ctx.lineTo(-6, -this.radius - 30);
+            ctx.lineTo(6, -this.radius - 30);
+            ctx.closePath();
+            ctx.fill();
+
+            // Aim Line / Laser Sight
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.aimAngle) * 45, Math.sin(this.aimAngle) * 45);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Health Bar & Name
+        ctx.restore();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.name, this.x, this.y - this.radius - 12);
+
+        // Health Bar Container
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(this.x - 20, this.y - this.radius - 8, 40, 5);
+        ctx.fillStyle = this.team === 'red' ? '#ef4444' : '#3b82f6';
+        ctx.fillRect(this.x - 20, this.y - this.radius - 8, (this.hp / this.maxHp) * 40, 5);
+    }
+}
+
+// --- PROJECTILE CLASS ---
+class Projectile {
+    constructor(x, y, vx, vy, type) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.type = type; // 'bazooka' | 'grenade'
+        this.radius = 4;
+        this.timer = type === 'grenade' ? 180 : 0; // 3 seconds at 60fps
+        this.bounces = 0;
+    }
+
+    update() {
+        if (this.type === 'bazooka') {
+            this.vx += wind * 0.05; // Wind effect on Bazooka
+        }
+        this.vy += GRAVITY;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Spawn Smoke Trail
+        if (Math.random() > 0.3) {
+            particles.push(new Particle(this.x, this.y, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, 'rgba(200, 200, 200, 0.5)', Math.random() * 4 + 2, 20));
+        }
+
+        // Impact & Collision Detection
+        if (this.type === 'bazooka') {
+            if (isSolid(this.x, this.y) || this.checkWormHit() || this.y >= WATER_LEVEL) {
+                this.explode();
+            }
+        } else if (this.type === 'grenade') {
+            if (isSolid(this.x, this.y)) {
+                this.vx *= -0.6; // Bounce elasticity
+                this.vy *= -0.6;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.bounces++;
+            }
+            this.timer--;
+            if (this.timer <= 0 || this.y >= WATER_LEVEL) {
+                this.explode();
+            }
+        }
+    }
+
+    checkWormHit() {
+        return worms.some(w => !w.isDead && Math.hypot(w.x - this.x, w.y - this.y) < w.radius + this.radius);
+    }
+
+    explode() {
+        const radius = this.type === 'bazooka' ? 35 : 50;
+        const maxDamage = this.type === 'bazooka' ? 45 : 60;
+        createExplosion(this.x, this.y, radius, maxDamage);
+        activeProjectile = null;
+        gameState = GAME_STATES.RESOLVING;
+        setTimeout(resolveTurnState, 1200);
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.type === 'bazooka' ? '#f97316' : '#16a34a';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Timer indicator for grenade
+        if (this.type === 'grenade') {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText(Math.ceil(this.timer / 60), this.x, this.y - 8);
+        }
+    }
+}
+
+// --- PARTICLES & VFX ---
+class Particle {
+    constructor(x, y, vx, vy, color, size, life) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.size = size;
+        this.life = life;
+        this.maxLife = life;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life--;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class FloatingText {
+    constructor(text, x, y, color) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.life = 40;
+    }
+
+    update() {
+        this.y -= 0.8;
+        this.life--;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life / 40);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+function createExplosion(x, y, radius, maxDamage) {
+    // Carve terrain hole
+    carveTerrain(x, y, radius);
+
+    // Spawn Particles
+    for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 6 + 2;
+        const color = ['#ef4444', '#f97316', '#eab308', '#6b7280'][Math.floor(Math.random() * 4)];
+        particles.push(new Particle(
+            x, y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            color,
+            Math.random() * 6 + 3,
+            30
+        ));
+    }
+
+    // Apply Damage & Impulse Blast to Worms
+    worms.forEach(w => {
+        if (w.isDead) return;
+        const dist = Math.hypot(w.x - x, w.y - y);
+        if (dist < radius + 15) {
+            const factor = 1 - (dist / (radius + 15));
+            const damage = factor * maxDamage;
+            w.takeDamage(damage);
+
+            // Blast Physics Impulse
+            const pushAngle = Math.atan2(w.y - y, w.x - x);
+            const force = factor * 12;
+            w.vx = Math.cos(pushAngle) * force;
+            w.vy = Math.sin(pushAngle) * force - 2; // Elevate
+            w.isGrounded = false;
+        }
+    });
+}
+
+// --- GAME LOGIC & FLOW ---
+function initGame() {
+    generateTerrain();
+
+    worms = [
+        new Worm(150, 100, 'red', 'Red Worm 1'),
+        new Worm(300, 100, 'red', 'Red Worm 2'),
+        new Worm(700, 100, 'blue', 'Blue Worm 1'),
+        new Worm(850, 100, 'blue', 'Blue Worm 2')
+    ];
+
+    startTurn();
+}
+
+function getActiveWorm() {
+    const teamWorms = worms.filter(w => w.team === currentTeam && !w.isDead);
+    if (teamWorms.length === 0) return null;
+    return teamWorms[activeWormIndex[currentTeam] % teamWorms.length];
+}
+
+function startTurn() {
+    // Check Victory Condition
+    const redAlive = worms.some(w => w.team === 'red' && !w.isDead);
+    const blueAlive = worms.some(w => w.team === 'blue' && !w.isDead);
+
+    if (!redAlive || !blueAlive) {
+        gameState = GAME_STATES.GAME_OVER;
+        return;
+    }
+
+    gameState = GAME_STATES.PLAYER_TURN;
+    power = 0;
+    isCharging = false;
+    wind = (Math.random() - 0.5) * 0.3; // Set random wind
+
+    turnTimer = 30;
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = setInterval(() => {
+        if (gameState === GAME_STATES.PLAYER_TURN) {
+            turnTimer--;
+            if (turnTimer <= 0) {
+                nextTurn();
+            }
+        }
+    }, 1000);
+}
+
+function nextTurn() {
+    clearInterval(turnTimerInterval);
+    activeWormIndex[currentTeam]++;
+    currentTeam = currentTeam === 'red' ? 'blue' : 'red';
+    startTurn();
+}
+
+function resolveTurnState() {
+    // Check if any worms are still moving/falling
+    const isMoving = worms.some(w => !w.isDead && (Math.abs(w.vx) > 0.1 || Math.abs(w.vy) > 0.1));
+    if (isMoving) {
+        setTimeout(resolveTurnState, 300);
+    } else {
+        nextTurn();
+    }
+}
+
+function fireWeapon() {
+    const w = getActiveWorm();
+    if (!w) return;
+
+    const speed = (power / 100) * 16 + 3;
+    const vx = Math.cos(w.aimAngle) * speed;
+    const vy = Math.sin(w.aimAngle) * speed;
+    const spawnX = w.x + Math.cos(w.aimAngle) * 20;
+    const spawnY = w.y + Math.sin(w.aimAngle) * 20;
+
+    activeProjectile = new Projectile(spawnX, spawnY, vx, vy, selectedWeapon);
+    gameState = GAME_STATES.PROJECTILE_IN_FLIGHT;
+    power = 0;
+    isCharging = false;
+}
+
+// --- INPUT HANDLERS ---
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+
+    if (gameState === GAME_STATES.PLAYER_TURN) {
+        if (e.code === 'Digit1') selectedWeapon = 'bazooka';
+        if (e.code === 'Digit2') selectedWeapon = 'grenade';
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+
+    if (e.code === 'Space' && isCharging && gameState === GAME_STATES.PLAYER_TURN) {
+        fireWeapon();
+    }
+});
+
+function handleInput() {
+    if (gameState !== GAME_STATES.PLAYER_TURN) return;
+
+    const w = getActiveWorm();
+    if (!w) return;
+
+    // Aim Controls
+    if (keys['KeyW'] || keys['ArrowUp']) {
+        w.aimAngle -= 0.03;
+    }
+    if (keys['KeyS'] || keys['ArrowDown']) {
+        w.aimAngle += 0.03;
+    }
+
+    // Movement Controls
+    if (keys['KeyA'] || keys['ArrowLeft']) {
+        w.move(-1);
+    }
+    if (keys['KeyD'] || keys['ArrowRight']) {
+        w.move(1);
+    }
+
+    // Charge Shot Power
+    if (keys['Space']) {
+        isCharging = true;
+        power = Math.min(100, power + 1.8);
+        if (power >= 100) {
+            fireWeapon();
+        }
+    }
+}
+
+// --- RENDERING & UI OVERLAYS ---
+function updateHUD() {
+    const redTotalHp = worms.filter(w => w.team === 'red').reduce((acc, w) => acc + w.hp, 0);
+    const blueTotalHp = worms.filter(w => w.team === 'blue').reduce((acc, w) => acc + w.hp, 0);
+
+    document.getElementById('red-hud').innerHTML = `RED TEAM: ${Math.round(redTotalHp)} HP`;
+    document.getElementById('blue-hud').innerHTML = `BLUE TEAM: ${Math.round(blueTotalHp)} HP`;
+
+    const turnInfo = document.getElementById('turn-info');
+    if (gameState === GAME_STATES.GAME_OVER) {
+        const winner = redTotalHp > 0 ? 'RED TEAM WINS!' : 'BLUE TEAM WINS!';
+        turnInfo.innerHTML = `<span style="color: #facc15">${winner}</span>`;
+    } else {
+        const activeColor = currentTeam === 'red' ? '#ef4444' : '#3b82f6';
+        turnInfo.innerHTML = `<span style="color:${activeColor}">${currentTeam.toUpperCase()} TURN</span> (${turnTimer}s)`;
+    }
+}
+
+function drawBackground() {
+    // Sky Gradient
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    skyGradient.addColorStop(0, '#0f172a');
+    skyGradient.addColorStop(0.7, '#1e293b');
+    skyGradient.addColorStop(1, '#334155');
+    ctx.fillStyle = skyGradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Draw Water
+    ctx.fillStyle = 'rgba(14, 165, 233, 0.7)';
+    ctx.fillRect(0, WATER_LEVEL, CANVAS_WIDTH, CANVAS_HEIGHT - WATER_LEVEL);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(0, WATER_LEVEL, CANVAS_WIDTH, 4); // Water surface highlight
+}
+
+function drawUI() {
+    if (gameState === GAME_STATES.GAME_OVER) return;
+
+    // Power Meter
+    if (isCharging) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(20, CANVAS_HEIGHT - 40, 204, 20);
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(22, CANVAS_HEIGHT - 38, power * 2, 16);
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(20, CANVAS_HEIGHT - 40, 204, 20);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`POWER: ${Math.round(power)}%`, 25, CANVAS_HEIGHT - 25);
+    }
+
+    // Wind Indicator
+    const windX = CANVAS_WIDTH - 150;
+    const windY = CANVAS_HEIGHT - 30;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(windX - 10, windY - 15, 140, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('WIND', windX, windY - 2);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(windX + 50, windY);
+    ctx.lineTo(windX + 50 + wind * 300, windY);
+    ctx.stroke();
+
+    // Weapon Box
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(20, 50, 160, 30);
+    ctx.fillStyle = '#facc15';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`WEAPON: ${selectedWeapon.toUpperCase()}`, 30, 70);
+}
+
+// --- MAIN LOOP ---
+function gameLoop() {
+    handleInput();
+
+    // Update Entities
+    worms.forEach(w => w.update());
+
+    if (activeProjectile) {
+        activeProjectile.update();
+    }
+
+    particles.forEach((p, index) => {
+        p.update();
+        if (p.life <= 0) particles.splice(index, 1);
+    });
+
+    floatingTexts.forEach((ft, index) => {
+        ft.update();
+        if (ft.life <= 0) floatingTexts.splice(index, 1);
+    });
+
+    // Render Scene
+    drawBackground();
+
+    // Draw Destructible Terrain
+    ctx.drawImage(terrainCanvas, 0, 0);
+
+    // Draw Entities
+    worms.forEach(w => w.draw());
+
+    if (activeProjectile) {
+        activeProjectile.draw();
+    }
+
+    particles.forEach(p => p.draw());
+    floatingTexts.forEach(ft => ft.draw());
+
+    drawUI();
+    updateHUD();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Start Game
+initGame();
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
