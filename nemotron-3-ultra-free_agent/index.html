@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worms - HTML5 Canvas Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-container">
+    <div class="ui-top">
+      <div class="player-info player-1">
+        <div class="player-name">PLAYER 1</div>
+        <div class="health-bar-container">
+          <div class="health-bar" id="health1"></div>
+        </div>
+        <div class="health-text" id="healthText1">100</div>
+      </div>
+      <div class="turn-indicator" id="turnIndicator">PLAYER 1'S TURN</div>
+      <div class="player-info player-2">
+        <div class="health-text" id="healthText2">100</div>
+        <div class="health-bar-container">
+          <div class="health-bar" id="health2"></div>
+        </div>
+        <div class="player-name">PLAYER 2</div>
+      </div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    
+    <div class="ui-bottom">
+      <div class="weapon-selector" id="weaponSelector">
+        <span class="weapon-label">WEAPON:</span>
+        <button class="weapon-btn active" data-weapon="0" title="Bazooka (1)">🚀</button>
+        <button class="weapon-btn" data-weapon="1" title="Grenade (2)">💣</button>
+        <button class="weapon-btn" data-weapon="2" title="Shotgun (3)">🔫</button>
+      </div>
+      <div class="controls-hint" id="controlsHint">
+        ← → Move &nbsp; ↑ Jump &nbsp; ↑/↓ Aim &nbsp; SPACE Fire &nbsp; 1/2/3 Weapon
+      </div>
+    </div>
+    
+    <div class="overlay" id="startOverlay">
+      <h1>WORMS</h1>
+      <p class="subtitle">Turn-Based Artillery Combat</p>
+      <div class="controls-list">
+        <div class="control-row"><kbd>← →</kbd><span>Move</span></div>
+        <div class="control-row"><kbd>↑</kbd><span>Jump / Aim Up</span></div>
+        <div class="control-row"><kbd>↓</kbd><span>Aim Down</span></div>
+        <div class="control-row"><kbd>SPACE</kbd><span>Fire Weapon</span></div>
+        <div class="control-row"><kbd>1 / 2 / 3</kbd><span>Select Weapon</span></div>
+      </div>
+      <button id="startBtn" class="btn-primary">START GAME</button>
+    </div>
+    
+    <div class="overlay hidden" id="gameOverOverlay">
+      <h1 id="winnerText">PLAYER 1 WINS!</h1>
+      <button id="restartBtn" class="btn-primary">PLAY AGAIN</button>
+    </div>
+    
+    <div class="overlay hidden" id="instructionsOverlay">
+      <h2>WEAPONS</h2>
+      <div class="weapon-info">
+        <div class="weapon-card">
+          <span class="weapon-icon">🚀</span>
+          <div>
+            <strong>Bazooka</strong><br>
+            <small>Fires an explosive rocket affected by gravity. Good range and damage.</small>
+          </div>
+        </div>
+        <div class="weapon-card">
+          <span class="weapon-icon">💣</span>
+          <div>
+            <strong>Grenade</strong><br>
+            <small>Timer-based explosion (3s). Can bounce and roll. Larger blast radius.</small>
+          </div>
+        </div>
+        <div class="weapon-card">
+          <span class="weapon-icon">🔫</span>
+          <div>
+            <strong>Shotgun</strong><br>
+            <small>Instant hit. Fires 8 pellets in a spread. High damage at close range.</small>
+          </div>
+        </div>
+      </div>
+      <button id="closeInstructions" class="btn-secondary">GOT IT</button>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
