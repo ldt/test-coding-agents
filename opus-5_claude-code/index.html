@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WORMS — HTML Artillery</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <!-- ── Top HUD ───────────────────────────────────────────── -->
+  <header id="hud">
+    <section class="team-card" id="team-0">
+      <div class="team-head">
+        <span class="team-dot"></span>
+        <span class="team-name">RED</span>
+        <span class="team-total">400</span>
+      </div>
+      <div class="team-bar"><i></i></div>
+      <ul class="team-worms"></ul>
+    </section>
+
+    <section id="turn-info">
+      <div id="clock">45</div>
+      <div id="active-worm">—</div>
+      <div id="wind">
+        <span class="wind-label">WIND</span>
+        <div class="wind-gauge"><i id="wind-fill"></i><b></b></div>
+        <span id="wind-value">0</span>
+      </div>
+    </section>
+
+    <section class="team-card right" id="team-1">
+      <div class="team-head">
+        <span class="team-total">400</span>
+        <span class="team-name">BLUE</span>
+        <span class="team-dot"></span>
+      </div>
+      <div class="team-bar"><i></i></div>
+      <ul class="team-worms"></ul>
+    </section>
+  </header>
+
+  <!-- ── Weapon dock ───────────────────────────────────────── -->
+  <div id="dock"></div>
+
+  <!-- ── Transient banner ──────────────────────────────────── -->
+  <div id="banner"><span></span></div>
+
+  <!-- ── Hint line ─────────────────────────────────────────── -->
+  <div id="hint"></div>
+
+  <!-- ── Overlays ──────────────────────────────────────────── -->
+  <div id="overlay" class="show">
+    <div class="panel">
+      <h1>W<span>O</span>RMS</h1>
+      <p class="tagline">Hot-seat artillery. Two teams. One keyboard. No survivors.</p>
+
+      <div class="controls">
+        <div><kbd>←</kbd><kbd>→</kbd><span>Walk</span></div>
+        <div><kbd>↑</kbd><kbd>↓</kbd><span>Aim</span></div>
+        <div><kbd>Enter</kbd><span>Jump</span></div>
+        <div><kbd>Space</kbd><span>Hold to charge, release to fire</span></div>
+        <div><kbd>1</kbd>–<kbd>6</kbd><span>Select weapon</span></div>
+        <div><kbd>Mouse</kbd><span>Aim &amp; target airstrike</span></div>
+        <div><kbd>N</kbd><span>Skip turn</span></div>
+        <div><kbd>M</kbd><span>Mute</span></div>
+      </div>
+
+      <button id="start-btn" type="button">START BATTLE</button>
+      <p class="foot">Explosions chew through the ground. Mind the wind — and the water.</p>
+    </div>
+  </div>
+
+  <div id="result">
+    <div class="panel">
+      <h2 id="result-title">RED TEAM WINS</h2>
+      <p id="result-sub">Last worm standing.</p>
+      <button id="rematch-btn" type="button">REMATCH</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
