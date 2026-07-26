@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worms: Pocket War</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!--
+      KIRO / SDD SPECIFICATION
+
+      REQUIREMENTS
+      R1. The game shall provide a local, turn-based artillery match for two teams of three worms.
+      R2. Players shall move, jump, aim a bazooka, charge a shot, and damage opponents with terrain-destroying explosions.
+      R3. A match shall end when only one team has living worms, with restart available at any time.
+      R4. The interface shall work with keyboard and mouse/touch-like pointer input on a modern desktop browser.
+
+      DESIGN
+      D1. HTML supplies a canvas game surface plus accessible controls and status panels; CSS owns the illustrated world and responsive layout.
+      D2. JavaScript owns a fixed-time animation loop, a pixel-mask terrain model, projectile physics, explosion damage, and a small turn state machine.
+      D3. Terrain is a hidden canvas mask. Collision checks opaque mask pixels; explosions erase circular mask areas, allowing simple destructibility.
+      D4. Input: A/D or arrows move, W/Space jumps, mouse aims, hold click or Enter charges/fires, R restarts.
+
+      TASKS
+      T1. Build the responsive playfield, status HUD, instructions, and semantic control buttons. [done]
+      T2. Implement procedural terrain, clouds, water, worms, camera presentation, and particles. [done]
+      T3. Implement turn rotation, physics, aiming, charged bazooka projectiles, explosion damage, and game-over state. [done]
+      T4. Add keyboard/pointer controls, restart handling, and small-screen layout rules. [done]
+    -->
+    <main class="shell">
+      <header class="masthead">
+        <a class="brand" href="#" aria-label="Worms Pocket War home"><span class="brand-mark">W</span><span>WORMS</span><em>POCKET WAR</em></a>
+        <div class="match-chip"><span class="dot"></span> LOCAL SKIRMISH <b>•</b> BEST OF ONE</div>
+        <button id="restartTop" class="icon-button" aria-label="Restart match">↻</button>
+      </header>
+
+      <section class="game-card" aria-label="Worms game">
+        <div class="hud top-hud">
+          <div class="team-card coral"><span class="portrait">●</span><div><small>THE BRAMBLE BUNCH</small><strong id="coralHealth">300 HP</strong></div><i class="turn-pip"></i></div>
+          <div class="round"><span>ROUND</span><b id="round">01</b><em id="turnLabel">BRAMBLE BUNCH'S TURN</em></div>
+          <div class="team-card teal"><i class="turn-pip"></i><div><small>THE TIDAL TERRORS</small><strong id="tealHealth">300 HP</strong></div><span class="portrait">●</span></div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="game" width="1200" height="620" aria-label="Destructible island battlefield"></canvas>
+          <div id="message" class="message" aria-live="polite"></div>
+          <div class="wind">WIND <b id="windArrow">→</b><span id="windPower">2</span></div>
+        </div>
+        <div class="hud bottom-hud">
+          <div class="active-worm"><span class="worm-dot coral-dot"></span><div><small>ACTIVE WORM</small><strong id="wormName">Moss</strong></div><b id="activeHp">100</b><span>HP</span></div>
+          <div class="timer"><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="17"/><circle id="timerRing" class="ring" cx="21" cy="21" r="17"/></svg><b id="timer">20</b></div>
+          <div class="weapon"><span class="weapon-icon">☄</span><div><small>WEAPON</small><strong>BAZOOKA</strong></div><b>∞</b></div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Game controls">
+        <div><kbd>←</kbd><kbd>→</kbd><span>MOVE</span></div><div><kbd>SPACE</kbd><span>JUMP</span></div><div><kbd>⌖</kbd><span>AIM</span></div><div><kbd>HOLD CLICK</kbd><span>CHARGE &amp; FIRE</span></div><div><kbd>R</kbd><span>RESTART</span></div>
+      </section>
+      <p class="tip">Tip: splash an opponent off the island—or blow the ground out from under them.</p>
+    </main>
+    <script src="game.js"></script>
+  </body>
+</html>
