@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worms — HTML Edition</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1024" height="576"></canvas>
+        <canvas id="uiCanvas" width="1024" height="576"></canvas>
+
+        <div id="ui">
+            <div id="hud">
+                <div id="turnIndicator">
+                    <span id="turnLabel">Team</span>
+                    <span id="turnTeam" class="team-red">RED</span>
+                </div>
+                <div id="healthContainer">
+                    <span id="healthLabel">Worm HP</span>
+                    <div id="healthBar">
+                        <div id="healthFill"></div>
+                    </div>
+                    <span id="healthValue">100</span>
+                </div>
+                <div id="teamInfo">
+                    <div class="teamCount" id="redCount">
+                        <span class="dot team-red"></span>
+                        <span class="count">4</span>
+                    </div>
+                    <div class="teamCount" id="blueCount">
+                        <span class="dot team-blue"></span>
+                        <span class="count">4</span>
+                    </div>
+                </div>
+                <div id="windIndicator">
+                    <span>Wind</span>
+                    <div id="windBar">
+                        <div id="windFill"></div>
+                    </div>
+                    <span id="windValue">0</span>
+                </div>
+            </div>
+
+            <div id="controls">
+                <button id="skipTurnBtn" class="btn">Skip Turn</button>
+                <button id="restartBtn" class="btn">Restart</button>
+            </div>
+        </div>
+
+        <div id="aimOverlay">
+            <div id="aimInfo">
+                <div class="aimStat">
+                    <span>Angle</span>
+                    <span id="angleValue">45°</span>
+                </div>
+                <div class="aimStat">
+                    <span>Power</span>
+                    <span id="powerValue">50%</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="messageOverlay" class="hidden">
+            <div id="messageBox">
+                <h1 id="messageTitle"></h1>
+                <p id="messageText"></p>
+                <button id="messageBtn" class="btn">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+/* ===== Reset & Base ===== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0a1a2a;
+    color: #e0e0e0;
+}
+
+/* ===== Game Container ===== */
+
+#gameContainer {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* ===== Canvases ===== */
+
+#gameCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: #1a2a3a;
+    display: block;
+}
+
+#uiCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    pointer-events: none;
+}
+
+/* ===== UI Overlay ===== */
+
+#ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+    z-index: 10;
+}
+
+#hud {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    pointer-events: none;
+}
+
+#turnIndicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#turnIndicator .team-red {
+    color: #ff4444;
+    text-shadow: 0 0 8px rgba(255, 68, 68, 0.7);
+}
+
+#turnIndicator .team-blue {
+    color: #44aaff;
+    text-shadow: 0 0 8px rgba(68, 170, 255, 0.7);
+}
+
+/* ===== Health Bar ===== */
+
+#healthContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+#healthBar {
+    width: 120px;
+    height: 16px;
+    background: #2a2a3a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+#healthFill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    transition: width 0.3s ease, background 0.3s ease;
+    border-radius: 8px;
+}
+
+#healthFill.low {
+    background: linear-gradient(90deg, #f44336, #ff5722);
+}
+
+#healthFill.critical {
+    background: linear-gradient(90deg, #d32f2f, #b71c1c);
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from { opacity: 1; }
+    to { opacity: 0.5; }
+}
+
+/* ===== Team Info ===== */
+
+#teamInfo {
+    display: flex;
+    gap: 12px;
+}
+
+.teamCount {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.team-red {
+    background: #ff4444;
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.8);
+}
+
+.team-blue {
+    background: #44aaff;
+    box-shadow: 0 0 6px rgba(68, 170, 255, 0.8);
+}
+
+/* ===== Wind Indicator ===== */
+
+#windIndicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+#windBar {
+    width: 80px;
+    height: 12px;
+    background: #2a2a3a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+#windFill {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, #44aaff, #2196f3);
+    transition: width 0.3s ease, margin-left 0.3s ease;
+    border-radius: 6px;
+}
+
+#windFill.negative {
+    background: linear-gradient(90deg, #ff9800, #ff5722);
+}
+
+/* ===== Controls ===== */
+
+#controls {
+    align-self: flex-end;
+    display: flex;
+    gap: 12px;
+    pointer-events: auto;
+    margin-bottom: 8px;
+}
+
+.btn {
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    color: #e0e0e0;
+    border: 2px solid #4a5a6a;
+    border-radius: 6px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn:hover {
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-color: #5a6a7a;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== Aim Overlay ===== */
+
+#aimOverlay {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    pointer-events: none;
+    z-index: 5;
+}
+
+#aimOverlay.visible {
+    display: block;
+}
+
+#aimInfo {
+    display: flex;
+    gap: 24px;
+    background: rgba(10, 26, 42, 0.8);
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.aimStat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.aimStat span:first-child {
+    font-size: 12px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.aimStat span:last-child {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+
+/* ===== Message Overlay ===== */
+
+#messageOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+#messageOverlay.hidden {
+    display: none;
+}
+
+#messageBox {
+    text-align: center;
+    padding: 40px;
+    background: linear-gradient(135deg, #1a2a3a, #2a3a4a);
+    border: 2px solid #444;
+    border-radius: 12px;
+    max-width: 400px;
+    width: 90%;
+}
+
+#messageBox h1 {
+    font-size: 32px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#messageBox h1.team-red {
+    color: #ff4444;
+    text-shadow: 0 0 12px rgba(255, 68, 68, 0.7);
+}
+
+#messageBox h1.team-blue {
+    color: #44aaff;
+    text-shadow: 0 0 12px rgba(68, 170, 255, 0.7);
+}
+
+#messageBox p {
+    font-size: 16px;
+    color: #aaa;
+    margin-bottom: 24px;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 768px) {
+    #gameContainer {
+        transform: scale(0.7);
+        transform-origin: center;
+    }
+
+    #hud {
+        gap: 10px;
+    }
+
+    #healthBar {
+        width: 80px;
+    }
+
+    #aimInfo {
+        gap: 16px;
+        padding: 8px 14px;
+    }
+}
