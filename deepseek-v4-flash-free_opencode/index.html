@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worms</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-container">
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div id="hud-left">
+      <div id="team-indicator"></div>
+      <div id="worm-hp-bar"><div id="worm-hp-fill"></div></div>
+    </div>
+    <div id="hud-center">
+      <div id="wind-display">Wind: <span id="wind-value">0</span></div>
+      <div id="turn-timer">Time: <span id="timer-value">30</span></div>
+    </div>
+    <div id="hud-right">
+      <div id="team2-indicator"></div>
+    </div>
+  </div>
+
+  <div id="power-bar-container">
+    <div id="power-bar-label">POWER</div>
+    <div id="power-bar"><div id="power-fill"></div></div>
+  </div>
+
+  <div id="game-over-overlay" class="hidden">
+    <div id="game-over-box">
+      <h1 id="victory-title">Game Over</h1>
+      <p id="victory-message"></p>
+      <button id="restart-btn">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
