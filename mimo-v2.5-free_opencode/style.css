@@ -1,0 +1,232 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+#game-container {
+    position: relative;
+    width: 1200px;
+    background: #0f0f1a;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+#game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    background: linear-gradient(90deg, #1a1a3e 0%, #2a2a5e 100%);
+    border-bottom: 2px solid #4a4a8a;
+}
+
+#team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+#team-name {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#worm-info {
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+#turn-timer {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    min-width: 80px;
+    text-align: center;
+}
+
+#turn-timer.warning {
+    color: #ff6b6b;
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+#weapon-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+#weapon-name {
+    font-size: 1.2em;
+    color: #fff;
+}
+
+#weapon-ammo {
+    font-size: 0.9em;
+    color: #4ecdc4;
+}
+
+#game-canvas {
+    display: block;
+    background: #87ceeb;
+    cursor: crosshair;
+}
+
+#game-footer {
+    padding: 15px 25px;
+    background: linear-gradient(90deg, #1a1a3e 0%, #2a2a5e 100%);
+    border-top: 2px solid #4a4a8a;
+}
+
+#controls {
+    margin-bottom: 10px;
+}
+
+#controls p {
+    color: #aaa;
+    font-size: 0.85em;
+}
+
+#controls strong {
+    color: #fff;
+}
+
+#health-bars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.health-bar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.health-bar-label {
+    font-size: 0.75em;
+    color: #aaa;
+}
+
+.health-bar {
+    width: 100px;
+    height: 12px;
+    background: #333;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #555;
+}
+
+.health-bar-fill {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    border-radius: 6px;
+}
+
+.health-bar-fill.team-0 {
+    background: linear-gradient(90deg, #ff6b6b, #ff8e8e);
+}
+
+.health-bar-fill.team-1 {
+    background: linear-gradient(90deg, #4ecdc4, #6ee7de);
+}
+
+.health-bar-fill.team-2 {
+    background: linear-gradient(90deg, #9b59b6, #bb77d4);
+}
+
+.health-bar-fill.team-3 {
+    background: linear-gradient(90deg, #f39c12, #f5b041);
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+.overlay h1 {
+    font-size: 4em;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+    margin-bottom: 20px;
+    letter-spacing: 8px;
+}
+
+.overlay p {
+    color: #aaa;
+    font-size: 1.2em;
+    margin-bottom: 30px;
+}
+
+.overlay button {
+    padding: 15px 50px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 30px;
+}
+
+.overlay button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+.overlay .instructions {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px 40px;
+    border-radius: 10px;
+}
+
+.overlay .instructions p {
+    font-size: 0.9em;
+    margin: 8px 0;
+    color: #ccc;
+}
+
+#winner-text {
+    color: #ffd700;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+}
+
+#stats {
+    font-size: 1em;
+    color: #888;
+}

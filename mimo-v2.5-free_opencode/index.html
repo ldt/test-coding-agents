@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worms - HTML Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="game-header">
+            <div id="team-info">
+                <span id="team-name">Team 1</span>
+                <span id="worm-info">Worm 1</span>
+            </div>
+            <div id="turn-timer">30</div>
+            <div id="weapon-info">
+                <span id="weapon-name">Bazooka</span>
+                <span id="weapon-ammo">∞</span>
+            </div>
+        </div>
+        
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="game-footer">
+            <div id="controls">
+                <p><strong>Controls:</strong> Arrow keys to move | Mouse to aim | Click to fire | Space to skip turn</p>
+            </div>
+            <div id="health-bars"></div>
+        </div>
+        
+        <div id="start-screen" class="overlay">
+            <h1>WORMS</h1>
+            <p>Classic turn-based combat</p>
+            <button id="start-btn">Start Game</button>
+            <div class="instructions">
+                <p>Arrow Keys - Move worm</p>
+                <p>Mouse - Aim weapon</p>
+                <p>Left Click - Fire</p>
+                <p>Space - Skip turn</p>
+            </div>
+        </div>
+        
+        <div id="victory-screen" class="overlay hidden">
+            <h1 id="winner-text">Team 1 Wins!</h1>
+            <p id="stats"></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
