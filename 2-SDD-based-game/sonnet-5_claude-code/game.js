@@ -757,6 +757,11 @@ function createGame(mode, options = {}) {
   const terrain = new Terrain();
   const seed = options.seed != null ? options.seed : Math.floor(Math.random() * 1e9);
   terrain.generate(seed);
+  // A dedicated RNG stream (distinct from terrain's) drives all gameplay
+  // randomness (wind, CPU aim error) so a given seed reproduces a whole
+  // match deterministically - important for the CPU aim tests and for
+  // debugging a specific reported match.
+  const rng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
 
   const cpuTeams = mode === 'demo' ? [0, 1] : mode === 'cpu' ? [1] : [];
   const teams = spawnTeams(terrain, options.names || ['Red Team', 'Blue Team'], { cpuTeams });
@@ -765,8 +770,9 @@ function createGame(mode, options = {}) {
     state: STATE.TURN_START,
     stateTime: 0,
     mode,
+    rng,
     teams,
-    activeTeam: options.firstTeam != null ? options.firstTeam : (Math.random() < 0.5 ? 0 : 1),
+    activeTeam: options.firstTeam != null ? options.firstTeam : (rng() < 0.5 ? 0 : 1),
     activeWorm: null,
     turnTimer: TURN_SECONDS,
     retreatTimer: 0,
@@ -785,6 +791,8 @@ function createGame(mode, options = {}) {
     selectedWeapon: 'bazooka',
     chargePower: 0,
     charging: false,
+    cpuPhase: null,
+    cpuLastTargetByTeam: {},
   };
 }
 
@@ -834,10 +842,11 @@ function startTurn(game) {
   game.stateTime = 0;
   game.turnTimer = TURN_SECONDS;
   game.retreatTimer = 0;
-  game.wind = (Math.random() * 2 - 1) * MAX_WIND;
+  game.wind = ((game.rng ? game.rng() : Math.random()) * 2 - 1) * MAX_WIND;
   game.shotsLeft = 0;
   game.chargePower = 0;
   game.charging = false;
+  game.cpuPhase = null;
   game.activeWorm = advanceRoundRobin(game.teams[game.activeTeam]);
   game.state = STATE.AIMING;
 }
@@ -1053,12 +1062,235 @@ function stepSettlingPhase(game, dt) {
 
 function stepGame(game, dt, input = {}) {
   game.stateTime += dt;
+  const activeTeam = game.teams && game.teams[game.activeTeam];
+  const isCpuDeciding = activeTeam && activeTeam.isCpu
+    && (game.state === STATE.AIMING || game.state === STATE.CHARGING);
+  if (isCpuDeciding) { stepCpuTurn(game, dt); return; }
+
   switch (game.state) {
     case STATE.AIMING: stepAiming(game, dt, input); break;
     case STATE.CHARGING: stepCharging(game, dt, input); break;
     case STATE.PROJECTILE: stepProjectilePhase(game, dt, input); break;
     case STATE.SETTLING: stepSettlingPhase(game, dt); break;
     default: break; // TITLE / GAME_OVER: driven by menu input, not the sim step
+  }
+}
+
+// ============================================================================
+// CPU OPPONENT (Req 7)
+// ============================================================================
+
+const CPU_THINK_SECONDS = 0.8;
+const CPU_SIMS_PER_FRAME = 8;
+const CPU_SIM_MAX_STEPS = 600; // 10s of simulated flight time, matches the projectile hard timeout
+const CPU_SIM_DT = 1 / 60;
+
+// A lightweight, allocation-light re-implementation of projectile flight
+// (gravity + optional wind + terrain collision) used only for scoring
+// candidate shots. It never mutates real game state.
+// Impact weapons (bazooka) explode on first contact, so "closest approach
+// during flight" is what matters. Fuse weapons (grenade) bounce and roll
+// for the *entire* fuse duration before exploding wherever they end up, so
+// scoring by in-flight closest-approach would be wrong - it must simulate
+// the full bounce sequence and score the final (explosion) position, or a
+// lobbed grenade that merely swings near the target on the way down would
+// look "good" even though it then rolls off downhill for 3 more seconds.
+function simulateShot(terrain, wind, startX, startY, angle, power, targetX, targetY, weapon) {
+  let x = startX, y = startY;
+  let vx = Math.cos(angle) * weapon.speed * power;
+  let vy = Math.sin(angle) * weapon.speed * power;
+  let closest = dist(x, y, targetX, targetY);
+  const hasFuse = weapon.fuse != null;
+  const totalSteps = hasFuse ? Math.max(1, Math.round(weapon.fuse / CPU_SIM_DT)) : CPU_SIM_MAX_STEPS;
+  const restitution = weapon.restitution != null ? weapon.restitution : 0.45;
+
+  for (let i = 0; i < totalSteps; i++) {
+    if (weapon.wind) vx += wind * CPU_SIM_DT;
+    vy += GRAVITY * CPU_SIM_DT;
+    const nx = x + vx * CPU_SIM_DT;
+    const ny = y + vy * CPU_SIM_DT;
+
+    if (nx < -20 || nx > terrain.width + 20 || ny > terrain.height + 20) {
+      if (!hasFuse) break;
+      return Infinity; // sailed off the map before the fuse ran out: a bad shot
+    }
+
+    if (ny >= 0 && terrain.solidAt(nx, ny)) {
+      if (!hasFuse) {
+        const d = dist(nx, ny, targetX, targetY);
+        if (d < closest) closest = d;
+        break;
+      }
+      // Bounce in place (mirrors bounceProjectile / stepOneProjectile: never
+      // step into solid ground, just reflect velocity and retry next tick).
+      vy = -vy * restitution;
+      vx *= 0.82;
+      if (Math.abs(vy) < 30) vy = 0;
+    } else {
+      x = nx;
+      y = ny;
+    }
+
+    const d = dist(x, y, targetX, targetY);
+    if (d < closest) closest = d;
+  }
+
+  return hasFuse ? dist(x, y, targetX, targetY) : closest;
+}
+
+function buildCpuCandidates() {
+  const candidates = [];
+  const bazooka = WEAPONS.bazooka;
+  for (const powerDeg of [50, 65, 80, 95, 100]) {
+    for (let deg = -85; deg <= 85; deg += 12) {
+      candidates.push({ kind: 'bazooka', weapon: bazooka, localAim: (deg * Math.PI) / 180, power: powerDeg / 100 });
+    }
+  }
+  const grenade = WEAPONS.grenade;
+  for (const powerDeg of [45, 60, 75]) {
+    for (let deg = -80; deg <= -20; deg += 15) {
+      candidates.push({ kind: 'grenade', weapon: grenade, localAim: (deg * Math.PI) / 180, power: powerDeg / 100 });
+    }
+  }
+  return candidates;
+}
+
+function pickCpuTarget(game, worm) {
+  let best = null, bestD = Infinity;
+  for (let ti = 0; ti < game.teams.length; ti++) {
+    if (ti === worm.team) continue;
+    for (const w of game.teams[ti].worms) {
+      if (!w.alive) continue;
+      const d = dist(worm.x, worm.y, w.x, w.y);
+      if (d < bestD) { bestD = d; best = w; }
+    }
+  }
+  return best;
+}
+
+function gaussianRandom(rand) {
+  const r = rand || Math.random;
+  const u = Math.max(r(), 1e-9);
+  const v = r();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function finalizeCpuSolution(game, worm) {
+  const best = game.cpuBest;
+  const teamIx = worm.team;
+  const target = game.cpuTarget;
+  const repeatTarget = target && game.cpuLastTargetByTeam[teamIx] === target.id;
+  const sigma = repeatTarget ? 0.03 : 0.09; // Req 7.2: error shrinks on a repeat target
+  if (target) game.cpuLastTargetByTeam[teamIx] = target.id;
+
+  if (!best) {
+    // No target / degenerate case: still act (Req 7.3) with a default lob.
+    game.cpuSolution = { kind: 'bazooka', localAim: -0.6, power: 0.7 };
+    return;
+  }
+  let localAim = clamp(best.localAim + gaussianRandom(game.rng) * sigma, -Math.PI / 2, Math.PI / 2);
+  game.cpuSolution = { kind: best.kind, localAim, power: clamp(best.power, 0.05, 1) };
+}
+
+function fireCpuSolution(game, worm) {
+  const team = game.teams[game.activeTeam];
+  const sol = game.cpuSolution;
+  if (sol.kind === 'shotgun') {
+    team.ammo.shotgun = Math.max(0, team.ammo.shotgun - 1);
+    fireShotgun(game, worm);
+    fireShotgun(game, worm);
+    game.retreatTimer = 0;
+    game.state = STATE.PROJECTILE;
+  } else if (sol.kind === 'dynamite') {
+    spawnProjectile(game, 'dynamite', worm, 1, team);
+    game.retreatTimer = RETREAT_SECONDS;
+    game.state = STATE.PROJECTILE;
+  } else {
+    spawnProjectile(game, sol.kind, worm, sol.power, team);
+    game.retreatTimer = RETREAT_SECONDS;
+    game.state = STATE.PROJECTILE;
+  }
+}
+
+// Runs the CPU's phase-scripted turn in place of human input whenever it is
+// a CPU team's turn during AIMING/CHARGING: think (visible pause, bounded
+// time-sliced shot search) -> aim sweep to the chosen solution -> charge ->
+// fire. Reuses the same PROJECTILE/RETREAT/SETTLING machinery afterward
+// (Req 7.4), so nothing downstream needs to know who fired.
+function stepCpuTurn(game, dt) {
+  const worm = game.activeWorm;
+  game.turnTimer -= dt;
+
+  if (!worm || !worm.alive || worm.hp <= 0) { enterSettling(game); return; }
+
+  if (game.turnTimer <= 0) {
+    // Safety net so the CPU can never stall the timer (Req 7.3, 9.*).
+    if (game.cpuSolution) fireCpuSolution(game, worm); else enterSettling(game);
+    return;
+  }
+
+  if (game.cpuPhase === null) {
+    game.cpuPhase = 'THINK';
+    game.cpuThinkTime = 0;
+    game.cpuCandidates = buildCpuCandidates();
+    game.cpuCandidateIx = 0;
+    game.cpuBest = null;
+    game.cpuTarget = pickCpuTarget(game, worm);
+    game.cpuSolution = null;
+    // Turn to face the target before building the (facing-relative) shot
+    // grid, otherwise every candidate would aim at the wrong hemisphere.
+    if (game.cpuTarget) worm.facing = game.cpuTarget.x >= worm.x ? 1 : -1;
+  }
+
+  if (game.cpuPhase === 'THINK') {
+    game.cpuThinkTime += dt;
+    if (game.cpuTarget) {
+      let sims = 0;
+      while (sims < CPU_SIMS_PER_FRAME && game.cpuCandidateIx < game.cpuCandidates.length) {
+        const c = game.cpuCandidates[game.cpuCandidateIx++];
+        const absAngle = worm.facing === 1 ? c.localAim : (Math.PI - c.localAim);
+        const score = simulateShot(game.terrain, game.wind, worm.x, worm.y, absAngle, c.power, game.cpuTarget.x, game.cpuTarget.y, c.weapon);
+        if (!game.cpuBest || score < game.cpuBest.score) game.cpuBest = { ...c, score };
+        sims++;
+      }
+    }
+    const searchDone = !game.cpuTarget || game.cpuCandidateIx >= game.cpuCandidates.length;
+    if (game.cpuThinkTime >= CPU_THINK_SECONDS && searchDone) {
+      finalizeCpuSolution(game, worm);
+      game.cpuPhase = 'AIM';
+    }
+    return;
+  }
+
+  if (game.cpuPhase === 'AIM') {
+    const sol = game.cpuSolution;
+    const diff = sol.localAim - worm.localAim;
+    if (Math.abs(diff) < 0.02) {
+      worm.localAim = sol.localAim;
+      updateAim(worm, {}, 0);
+      game.cpuPhase = 'ACT';
+    } else {
+      worm.localAim = clamp(worm.localAim + Math.sign(diff) * AIM_SPEED * dt, -Math.PI / 2, Math.PI / 2);
+      updateAim(worm, {}, 0);
+    }
+    return;
+  }
+
+  if (game.cpuPhase === 'ACT') {
+    const sol = game.cpuSolution;
+    const weapon = WEAPONS[sol.kind];
+    if (!weapon.charge) {
+      fireCpuSolution(game, worm);
+      return;
+    }
+    if (game.state !== STATE.CHARGING) {
+      game.state = STATE.CHARGING;
+      game.chargePower = 0;
+    }
+    game.chargePower = clamp(game.chargePower + dt / CHARGE_SECONDS, 0, 1);
+    if (game.chargePower >= Math.min(sol.power, 1) - 1e-3) {
+      fireCpuSolution(game, worm);
+    }
   }
 }
 
@@ -1082,5 +1314,6 @@ if (typeof module !== 'undefined' && module.exports) {
     fireShotgun,
     MAX_WIND, createGame, advanceRoundRobin, checkWinDraw, startTurn, endTurn,
     AIM_SPEED, updateAim, stepGame, processDeaths, enterSettling,
+    simulateShot, buildCpuCandidates, pickCpuTarget, stepCpuTurn,
   };
 }
