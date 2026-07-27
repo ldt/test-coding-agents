@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Worms — HTML Edition</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game" width="1280" height="720"></canvas>
+
+    <!-- Top HUD -->
+    <div id="hud-top">
+      <div id="turn-info" class="panel">
+        <span id="team-name" class="team-label">Red Team</span>
+        <span class="sep">•</span>
+        <span id="worm-name">Worm 1</span>
+      </div>
+      <div id="wind-panel" class="panel">
+        <span class="label">Wind</span>
+        <span id="wind-arrow">→</span>
+        <span id="wind-mag">0</span>
+      </div>
+      <div id="timer-panel" class="panel">
+        <span class="label">Time</span>
+        <span id="timer">45</span>
+      </div>
+    </div>
+
+    <!-- Bottom weapon bar -->
+    <div id="hud-bottom">
+      <button class="weapon-btn selected" data-weapon="0">
+        <span class="key">1</span><span class="name">Bazooka</span>
+      </button>
+      <button class="weapon-btn" data-weapon="1">
+        <span class="key">2</span><span class="name">Grenade</span>
+      </button>
+      <button class="weapon-btn" data-weapon="2">
+        <span class="key">3</span><span class="name">Shotgun</span>
+      </button>
+      <button class="weapon-btn" data-weapon="3">
+        <span class="key">4</span><span class="name">Airstrike</span>
+      </button>
+      <button id="skip-btn" class="action-btn">Skip (Space)</button>
+    </div>
+
+    <!-- Help overlay -->
+    <div id="help-panel" class="panel">
+      <strong>Controls</strong><br />
+      Mouse: aim • Hold LMB: charge power • Release: fire<br />
+      1–4: weapons • A/D: walk • Space: skip • R: restart
+    </div>
+
+    <!-- Game over overlay -->
+    <div id="gameover" class="hidden">
+      <div class="gameover-card">
+        <h1 id="winner-text">Red Team Wins!</h1>
+        <button id="play-again">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
