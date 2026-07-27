@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worms Duel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="viewport">
+      <canvas id="game-canvas" width="1600" height="900"></canvas>
+
+      <div id="hud" class="hidden">
+        <div id="hud-top">
+          <div id="team-bars">
+            <div class="team-bar" id="team-bar-0">
+              <span class="team-name" id="team-name-0">Team 1</span>
+              <div class="hp-track"><div class="hp-fill" id="hp-fill-0"></div></div>
+              <span class="hp-value" id="hp-value-0">400</span>
+            </div>
+            <div class="team-bar" id="team-bar-1">
+              <span class="team-name" id="team-name-1">Team 2</span>
+              <div class="hp-track"><div class="hp-fill" id="hp-fill-1"></div></div>
+              <span class="hp-value" id="hp-value-1">400</span>
+            </div>
+          </div>
+          <div id="turn-info">
+            <div id="active-team-label">Team 1's turn</div>
+            <div id="turn-timer">45</div>
+            <div id="sudden-death-badge" class="hidden">SUDDEN DEATH</div>
+          </div>
+          <div id="wind-indicator">
+            <span id="wind-label">WIND</span>
+            <div id="wind-arrow-track"><div id="wind-arrow">&#8594;</div></div>
+          </div>
+        </div>
+
+        <div id="hud-bottom">
+          <div id="weapon-panel"></div>
+          <div id="power-gauge-wrap" class="hidden">
+            <div id="power-gauge-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="title-screen" class="screen">
+        <h1>WORMS DUEL</h1>
+        <p class="subtitle">A destructible-terrain artillery duel</p>
+        <div class="menu-buttons">
+          <button id="btn-2p" type="button">2 Players</button>
+          <button id="btn-cpu" type="button">vs CPU</button>
+        </div>
+        <div class="controls-summary">
+          <h2>Controls</h2>
+          <ul>
+            <li><strong>&larr; / &rarr;</strong> walk</li>
+            <li><strong>&uarr; / &darr;</strong> aim</li>
+            <li><strong>Enter / Z</strong> jump</li>
+            <li><strong>1&ndash;5</strong> select weapon</li>
+            <li><strong>Space</strong> hold to charge &amp; fire</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="victory-screen" class="screen hidden">
+        <h1 id="victory-title">Team 1 Wins!</h1>
+        <button id="btn-rematch" type="button">Rematch</button>
+      </div>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
