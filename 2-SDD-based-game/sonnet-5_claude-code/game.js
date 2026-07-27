@@ -40,6 +40,13 @@ const FIXED_DT = 1 / 60;
 const JUMP_VX = 130; // px/s forward arc jump
 const JUMP_VY = 280; // px/s upward arc jump
 
+// Assigned inside the browser-only bootstrap below. Declared here (top-level,
+// `let`) so explode()/spawnProjectile()/fireShotgun() — all defined earlier
+// in the file — can see the real function once it exists; a `function`
+// declaration nested inside the bootstrap's `if` block would be block-scoped
+// and invisible to them.
+let playSound = null;
+
 const STATE = Object.freeze({
   TITLE: 'TITLE',
   TURN_START: 'TURN_START',
@@ -102,6 +109,7 @@ class Terrain {
     this.waterHeight = 90;
     this.waterY = height - this.waterHeight;
     this.rand = mulberry32(1);
+    this.dirty = true; // renderer's cue to re-blit the offscreen terrain canvas
   }
 
   idx(x, y) {
@@ -127,6 +135,7 @@ class Terrain {
       attempt++;
     } while (zones.length < MIN_STANDING_ZONES && attempt < MAX_ATTEMPTS);
     this._zones = zones;
+    this.dirty = true;
     return zones;
   }
 
@@ -341,6 +350,7 @@ class Terrain {
       while (y < H && this.solid[this.idx(x, y)] === 0) y++;
       this.heights[x] = y < H ? y : H;
     }
+    this.dirty = true;
   }
 }
 
@@ -433,6 +443,7 @@ function stepWormPhysics(worm, terrain, dt, input = {}) {
     worm.vx = 0;
     worm.vy = 0;
     worm.drowned = true;
+    if (typeof playSound === 'function') playSound('splash'); // Req 8.7
   }
 }
 
@@ -862,6 +873,7 @@ function endTurn(game) {
   }
   game.activeTeam = (game.activeTeam + 1) % game.teams.length;
   startTurn(game);
+  if (typeof playSound === 'function') playSound('turn'); // Req 8.7
 }
 
 // ============================================================================
@@ -1291,6 +1303,484 @@ function stepCpuTurn(game, dt) {
     if (game.chargePower >= Math.min(sol.power, 1) - 1e-3) {
       fireCpuSolution(game, worm);
     }
+  }
+}
+
+// ============================================================================
+// BROWSER BOOTSTRAP (rendering, audio, input, HUD, main loop)
+// Skipped entirely under Node (no `document`) so the pure sim above stays
+// unit-testable; everything from here down only ever runs in a real page.
+// ============================================================================
+if (typeof document !== 'undefined') {
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+
+  const renderState = { terrainCanvas: null, terrainCtx: null };
+  let currentGame = null;
+
+  // ---- Audio (Req 8.7) ------------------------------------------------
+
+  let audioCtx = null;
+  let audioEnabled = true;
+
+  function ensureAudio() {
+    if (audioCtx || !audioEnabled) return;
+    try {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctor();
+    } catch (e) {
+      audioEnabled = false;
+    }
+  }
+
+  function makeNoiseBuffer(ctx, duration) {
+    const size = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size);
+    return buffer;
+  }
+
+  playSound = function playSound(kind, param) {
+    if (!audioEnabled || !audioCtx) return;
+    try {
+      const ctx2 = audioCtx;
+      const now = ctx2.currentTime;
+      if (kind === 'fire') {
+        const osc = ctx2.createOscillator();
+        const gain = ctx2.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(700, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.18);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain).connect(ctx2.destination);
+        osc.start(now); osc.stop(now + 0.22);
+      } else if (kind === 'explosion') {
+        const radius = param || 50;
+        const dur = clamp(radius / 120, 0.25, 0.9);
+        const noise = ctx2.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx2, dur);
+        const filter = ctx2.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(clamp(1800 - radius * 8, 200, 1800), now);
+        const gain = ctx2.createGain();
+        gain.gain.setValueAtTime(clamp(radius / 70, 0.25, 0.9), now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        noise.connect(filter).connect(gain).connect(ctx2.destination);
+        noise.start(now);
+      } else if (kind === 'splash') {
+        const noise = ctx2.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx2, 0.35);
+        const filter = ctx2.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 900;
+        const gain = ctx2.createGain();
+        gain.gain.setValueAtTime(0.28, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        noise.connect(filter).connect(gain).connect(ctx2.destination);
+        noise.start(now);
+      } else if (kind === 'turn') {
+        const osc = ctx2.createOscillator();
+        const gain = ctx2.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(660, now + 0.09);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain).connect(ctx2.destination);
+        osc.start(now); osc.stop(now + 0.22);
+      } else if (kind === 'shotgun') {
+        const noise = ctx2.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx2, 0.12);
+        const gain = ctx2.createGain();
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+        noise.connect(gain).connect(ctx2.destination);
+        noise.start(now);
+      } else if (kind === 'ui') {
+        const osc = ctx2.createOscillator();
+        const gain = ctx2.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain).connect(ctx2.destination);
+        osc.start(now); osc.stop(now + 0.12);
+      }
+    } catch (e) {
+      // Req 8.7: audio failure disables sound without affecting gameplay.
+      audioEnabled = false;
+    }
+  };
+
+  // ---- Rendering --------------------------------------------------------
+
+  function syncTerrainCanvas(terrain) {
+    if (!renderState.terrainCanvas || renderState.terrainCanvas.width !== terrain.width) {
+      renderState.terrainCanvas = document.createElement('canvas');
+      renderState.terrainCanvas.width = terrain.width;
+      renderState.terrainCanvas.height = terrain.height;
+      renderState.terrainCtx = renderState.terrainCanvas.getContext('2d');
+      terrain.dirty = true;
+    }
+    if (terrain.dirty) {
+      renderState.terrainCtx.putImageData(new ImageData(terrain.color, terrain.width, terrain.height), 0, 0);
+      terrain.dirty = false;
+    }
+  }
+
+  function drawWorm(g, worm, team, isActive) {
+    if (!worm.alive) return;
+    g.save();
+    g.translate(worm.x, worm.y);
+    g.beginPath();
+    g.arc(0, 0, WORM_RADIUS, 0, Math.PI * 2);
+    g.fillStyle = team.color;
+    g.fill();
+    g.lineWidth = 1.5;
+    g.strokeStyle = 'rgba(0,0,0,0.4)';
+    g.stroke();
+    g.beginPath();
+    g.arc(worm.facing * 4, -3, 2.2, 0, Math.PI * 2);
+    g.fillStyle = '#fff';
+    g.fill();
+    g.beginPath();
+    g.arc(worm.facing * 4.8, -3, 1.1, 0, Math.PI * 2);
+    g.fillStyle = '#111';
+    g.fill();
+    g.restore();
+
+    if (isActive) {
+      g.save();
+      g.translate(worm.x, worm.y - WORM_RADIUS - 15);
+      g.beginPath();
+      g.moveTo(-6, 0); g.lineTo(6, 0); g.lineTo(0, 9);
+      g.closePath();
+      g.fillStyle = '#ffd23f';
+      g.fill();
+      g.restore();
+
+      g.save();
+      g.translate(worm.x, worm.y);
+      g.rotate(worm.aimAngle);
+      g.strokeStyle = 'rgba(255,255,255,0.9)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(WORM_RADIUS + 2, 0);
+      g.lineTo(WORM_RADIUS + 17, 0);
+      g.stroke();
+      g.restore();
+    }
+
+    g.save();
+    g.font = 'bold 11px sans-serif';
+    g.textAlign = 'center';
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(0,0,0,0.65)';
+    g.fillStyle = '#fff';
+    const label = String(Math.max(0, Math.round(worm.hp)));
+    g.strokeText(label, worm.x, worm.y - WORM_RADIUS - 17);
+    g.fillText(label, worm.x, worm.y - WORM_RADIUS - 17);
+    g.restore();
+  }
+
+  function updateCamera(game, dt) {
+    if (game.camera.shakeT > 0) {
+      game.camera.shakeT -= dt;
+      game.camera.shakeMag *= 0.88;
+      if (game.camera.shakeT <= 0 || game.camera.shakeMag < 0.15) {
+        game.camera.shakeT = 0;
+        game.camera.shakeMag = 0;
+      }
+    }
+  }
+
+  function updateCosmetics(game, dt) {
+    for (const p of game.particles) {
+      p.age += dt;
+      p.vy += GRAVITY * 0.3 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    game.particles = game.particles.filter((p) => p.age < p.life);
+    for (const d of game.damageNumbers) d.age += dt;
+    game.damageNumbers = game.damageNumbers.filter((d) => d.age < 1.1);
+  }
+
+  function render(game) {
+    syncTerrainCanvas(game.terrain);
+    const W = game.terrain.width, H = game.terrain.height;
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    const shakeMag = game.camera.shakeMag || 0;
+    if (shakeMag > 0.15) {
+      ctx.translate((Math.random() * 2 - 1) * shakeMag, (Math.random() * 2 - 1) * shakeMag);
+    }
+
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#3a6ea5');
+    sky.addColorStop(1, '#bfe3f5');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.drawImage(renderState.terrainCanvas, 0, 0);
+
+    const waterY = game.terrain.waterY;
+    const t = performance.now() / 1000;
+    ctx.fillStyle = 'rgba(28,94,150,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, waterY);
+    for (let x = 0; x <= W; x += 24) {
+      ctx.lineTo(x, waterY + Math.sin(x * 0.02 + t * 1.6) * 3);
+    }
+    ctx.lineTo(W, waterY);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
+    for (const grave of game.graves) {
+      ctx.save();
+      ctx.translate(grave.x, grave.y);
+      ctx.fillStyle = '#8a8a8a';
+      ctx.fillRect(-7, -6, 14, 14);
+      ctx.beginPath();
+      ctx.arc(0, -6, 7, Math.PI, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for (const team of game.teams) {
+      for (const w of team.worms) {
+        const isActive = game.activeWorm === w
+          && (game.state === STATE.AIMING || game.state === STATE.CHARGING || game.state === STATE.PROJECTILE);
+        drawWorm(ctx, w, team, isActive);
+      }
+    }
+
+    for (const p of game.projectiles) {
+      ctx.beginPath();
+      const isRound = p.kind === 'grenade' || p.kind === 'cluster' || p.kind === 'bomblet';
+      ctx.arc(p.x, p.y, p.kind === 'bomblet' ? 4 : p.kind === 'dynamite' ? 6 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = isRound ? '#3a7d3a' : (p.kind === 'dynamite' ? '#c0392b' : '#2b2b2b');
+      ctx.fill();
+    }
+
+    for (const p of game.particles) {
+      ctx.globalAlpha = clamp(1 - p.age / p.life, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    for (const d of game.damageNumbers) {
+      ctx.globalAlpha = clamp(1 - d.age / 1.1, 0, 1);
+      ctx.fillStyle = '#ff5252';
+      ctx.fillText('-' + d.value, d.x, d.y - 20 - d.age * 26);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // ---- HUD ----------------------------------------------------------------
+
+  const teamNameEls = [document.getElementById('team-name-0'), document.getElementById('team-name-1')];
+  const hpValueEls = [document.getElementById('hp-value-0'), document.getElementById('hp-value-1')];
+  const hpFillEls = [document.getElementById('hp-fill-0'), document.getElementById('hp-fill-1')];
+  const activeTeamLabelEl = document.getElementById('active-team-label');
+  const turnTimerEl = document.getElementById('turn-timer');
+  const suddenDeathBadgeEl = document.getElementById('sudden-death-badge');
+  const windArrowEl = document.getElementById('wind-arrow');
+  const windLabelEl = document.getElementById('wind-label');
+  const weaponPanelEl = document.getElementById('weapon-panel');
+  const powerGaugeWrapEl = document.getElementById('power-gauge-wrap');
+  const powerGaugeFillEl = document.getElementById('power-gauge-fill');
+
+  function updateHUD(game) {
+    for (let i = 0; i < 2; i++) {
+      const team = game.teams[i];
+      const totalHp = team.worms.reduce((s, w) => s + Math.max(0, w.hp), 0);
+      const maxHp = team.worms.length * WORM_START_HP;
+      teamNameEls[i].textContent = team.name;
+      hpValueEls[i].textContent = String(Math.round(totalHp));
+      hpFillEls[i].style.width = clamp((totalHp / maxHp) * 100, 0, 100) + '%';
+    }
+
+    activeTeamLabelEl.textContent = game.teams[game.activeTeam].name + "'s turn";
+    turnTimerEl.textContent = String(Math.max(0, Math.ceil(game.turnTimer)));
+    suddenDeathBadgeEl.classList.toggle('hidden', !game.suddenDeath);
+
+    const windPct = clamp(Math.abs(game.wind) / MAX_WIND, 0, 1);
+    windArrowEl.style.transform = `scaleX(${game.wind < 0 ? -1 : 1}) scale(${0.6 + windPct * 0.8})`;
+    windLabelEl.textContent = 'WIND ' + Math.round(windPct * 100) + '%';
+
+    // Rebuild the weapon panel's DOM only when something in it actually
+    // changed (selection, active team, or an ammo count) - design.md calls
+    // for "HUD ... updated only when values change", and rebuilding every
+    // frame also makes the panel effectively unclickable (nodes get torn
+    // down mid-click).
+    const team = game.teams[game.activeTeam];
+    const sig = game.activeTeam + '|' + game.selectedWeapon + '|'
+      + WEAPON_ORDER.map((k) => team.ammo[k]).join(',');
+    if (sig !== weaponPanelEl.dataset.sig) {
+      weaponPanelEl.dataset.sig = sig;
+      weaponPanelEl.innerHTML = '';
+      for (const kind of WEAPON_ORDER) {
+        const w = WEAPONS[kind];
+        const slot = document.createElement('div');
+        const depleted = !canSelectWeapon(team, kind);
+        slot.className = 'weapon-slot'
+          + (game.selectedWeapon === kind ? ' selected' : '')
+          + (depleted ? ' depleted' : '');
+        const ammoText = Number.isFinite(w.ammo) ? String(team.ammo[kind] != null ? team.ammo[kind] : w.ammo) : '∞';
+        slot.innerHTML = `<span class="wkey">${w.key}</span><span class="wname">${w.name}</span><span class="wammo">${ammoText}</span>`;
+        if (!depleted) {
+          slot.addEventListener('click', () => { pendingWeaponSelect = kind; });
+        }
+        weaponPanelEl.appendChild(slot);
+      }
+    }
+
+    const showGauge = game.state === STATE.CHARGING;
+    powerGaugeWrapEl.classList.toggle('hidden', !showGauge);
+    if (showGauge) powerGaugeFillEl.style.width = Math.round(game.chargePower * 100) + '%';
+  }
+
+  // ---- Input --------------------------------------------------------------
+
+  const heldKeys = new Set();
+  let pendingJump = false;
+  let pendingFire = false;
+  let pendingWeaponSelect = null;
+
+  const KEY_TO_WEAPON = {};
+  for (const kind of WEAPON_ORDER) KEY_TO_WEAPON[WEAPONS[kind].key] = kind;
+
+  const PREVENT_DEFAULT_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar']);
+
+  function onKeyDown(e) {
+    if (PREVENT_DEFAULT_KEYS.has(e.key)) e.preventDefault();
+    if (e.code === 'Space') {
+      if (!e.repeat) pendingFire = true;
+      heldKeys.add('Space');
+    } else if (e.code === 'Enter' || e.code === 'KeyZ') {
+      if (!e.repeat) pendingJump = true;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      heldKeys.add(e.key);
+    } else if (KEY_TO_WEAPON[e.key]) {
+      pendingWeaponSelect = KEY_TO_WEAPON[e.key];
+    }
+  }
+
+  function onKeyUp(e) {
+    if (e.code === 'Space') heldKeys.delete('Space');
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      heldKeys.delete(e.key);
+    }
+  }
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  // State-transition guard (Req 9.3): only AIMING/CHARGING/PROJECTILE(retreat)
+  // consume movement/aim/fire input at all - stepGame already routes strictly
+  // by game.state, so building the input object is always safe; it's simply
+  // ignored by whichever phase handler doesn't read a given field.
+  function buildInput() {
+    const input = {
+      left: heldKeys.has('ArrowLeft'),
+      right: heldKeys.has('ArrowRight'),
+      aimUp: heldKeys.has('ArrowUp'),
+      aimDown: heldKeys.has('ArrowDown'),
+      fireHeld: heldKeys.has('Space'),
+      fire: pendingFire,
+      jump: pendingJump,
+      weaponSelect: pendingWeaponSelect,
+    };
+    pendingFire = false;
+    pendingJump = false;
+    pendingWeaponSelect = null;
+    return input;
+  }
+
+  // ---- Screens / match lifecycle ------------------------------------------
+
+  const titleScreenEl = document.getElementById('title-screen');
+  const victoryScreenEl = document.getElementById('victory-screen');
+  const hudEl = document.getElementById('hud');
+  const victoryTitleEl = document.getElementById('victory-title');
+
+  function startMatch(mode) {
+    titleScreenEl.classList.add('hidden');
+    victoryScreenEl.classList.add('hidden');
+    hudEl.classList.remove('hidden');
+    currentGame = createGame(mode);
+    startTurn(currentGame);
+    renderState.terrainCanvas = null;
+    accumulator = 0;
+    lastTime = null;
+    window.__game = currentGame;
+    if (audioEnabled) playSound('ui');
+  }
+
+  function showVictoryScreen(game) {
+    victoryTitleEl.textContent = game.draw ? 'Draw!' : `${game.teams[game.winner].name} Wins!`;
+    victoryScreenEl.classList.remove('hidden');
+    hudEl.classList.add('hidden');
+  }
+
+  document.getElementById('btn-2p').addEventListener('click', () => { ensureAudio(); startMatch('pvp'); });
+  document.getElementById('btn-cpu').addEventListener('click', () => { ensureAudio(); startMatch('cpu'); });
+  document.getElementById('btn-rematch').addEventListener('click', () => {
+    victoryScreenEl.classList.add('hidden');
+    startMatch(currentGame.mode);
+  });
+
+  // ---- Main loop (Req 1.1, 9.4: clamped-delta fixed-step accumulator) ----
+
+  let lastTime = null;
+  let accumulator = 0;
+  const MAX_STEPS_PER_FRAME = 8; // avoids a spiral-of-death catch-up storm
+
+  function tick(now) {
+    requestAnimationFrame(tick);
+    if (lastTime == null) lastTime = now;
+    let rawDt = (now - lastTime) / 1000;
+    lastTime = now;
+    rawDt = Math.min(rawDt, 0.1); // Req 9.4: clamp so a backgrounded tab can't desync/explode the sim
+
+    if (currentGame && currentGame.state !== STATE.GAME_OVER) {
+      accumulator += rawDt;
+      let steps = 0;
+      while (accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
+        stepGame(currentGame, FIXED_DT, buildInput());
+        accumulator -= FIXED_DT;
+        steps++;
+        if (currentGame.state === STATE.GAME_OVER) { accumulator = 0; break; }
+      }
+      updateCamera(currentGame, rawDt);
+      updateCosmetics(currentGame, rawDt);
+    }
+
+    if (currentGame) {
+      render(currentGame);
+      if (currentGame.state === STATE.GAME_OVER) showVictoryScreen(currentGame);
+      else updateHUD(currentGame);
+    }
+  }
+
+  requestAnimationFrame(tick);
+
+  // ---- Demo mode (Req 9.5) -------------------------------------------------
+
+  if (new URLSearchParams(window.location.search).has('demo')) {
+    startMatch('demo');
   }
 }
 

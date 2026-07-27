@@ -270,6 +270,8 @@ html, body {
   border-radius: 0.4vh;
   background: rgba(255, 255, 255, 0.06);
   min-width: 4vw;
+  pointer-events: auto; /* #hud disables pointer-events; opt this back in so clicks reach it */
+  cursor: pointer;
 }
 
 .weapon-slot.selected {
@@ -279,6 +281,7 @@ html, body {
 
 .weapon-slot.depleted {
   opacity: 0.35;
+  cursor: default;
 }
 
 .weapon-slot .wkey {
