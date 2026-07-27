@@ -359,7 +359,8 @@ function createWorm({ id, team, x, y }) {
     vx: 0, vy: 0,
     hp: WORM_START_HP,
     facing: 1,
-    aimAngle: -0.35,
+    localAim: -0.35, // angle in [-PI/2, PI/2] relative to the facing direction
+    aimAngle: -0.35, // absolute world-space angle, mirrored from localAim by facing
     alive: true,
     atRest: false,
     fallStartY: y,
@@ -747,6 +748,321 @@ function fireShotgun(game, worm) {
 }
 
 // ============================================================================
+// GAME FACTORY + TURN / STATE MACHINE
+// ============================================================================
+
+const MAX_WIND = 120; // px/s^2, HUD shows direction/strength (Req 5.8)
+
+function createGame(mode, options = {}) {
+  const terrain = new Terrain();
+  const seed = options.seed != null ? options.seed : Math.floor(Math.random() * 1e9);
+  terrain.generate(seed);
+
+  const cpuTeams = mode === 'demo' ? [0, 1] : mode === 'cpu' ? [1] : [];
+  const teams = spawnTeams(terrain, options.names || ['Red Team', 'Blue Team'], { cpuTeams });
+
+  return {
+    state: STATE.TURN_START,
+    stateTime: 0,
+    mode,
+    teams,
+    activeTeam: options.firstTeam != null ? options.firstTeam : (Math.random() < 0.5 ? 0 : 1),
+    activeWorm: null,
+    turnTimer: TURN_SECONDS,
+    retreatTimer: 0,
+    wind: 0,
+    shotsLeft: 0,
+    turnCount: 0,
+    suddenDeath: false,
+    projectiles: [],
+    particles: [],
+    damageNumbers: [],
+    graves: [],
+    terrain,
+    camera: { shakeT: 0, shakeMag: 0 },
+    winner: null,
+    draw: false,
+    selectedWeapon: 'bazooka',
+    chargePower: 0,
+    charging: false,
+  };
+}
+
+// Persistent per-team cursor that advances past dead worms so every worm
+// gets used in turn (Req 3.2) rather than always picking "first living".
+function advanceRoundRobin(team) {
+  const n = team.worms.length;
+  if (!team.worms.some((w) => w.alive)) return null;
+  let idx = team.activeWormCursor;
+  for (let i = 0; i < n; i++) {
+    const w = team.worms[idx];
+    if (w.alive) {
+      team.activeWormCursor = (idx + 1) % n;
+      return w;
+    }
+    idx = (idx + 1) % n;
+  }
+  return null;
+}
+
+function checkWinDraw(teams) {
+  const aliveTeamIdx = [];
+  for (let i = 0; i < teams.length; i++) {
+    if (teams[i].worms.some((w) => w.alive)) aliveTeamIdx.push(i);
+  }
+  if (aliveTeamIdx.length === teams.length) return { over: false, draw: false, winner: null };
+  if (aliveTeamIdx.length === 0) return { over: true, draw: true, winner: null };
+  if (aliveTeamIdx.length === 1) return { over: true, draw: false, winner: aliveTeamIdx[0] };
+  return { over: false, draw: false, winner: null };
+}
+
+function startTurn(game) {
+  if (game.turnCount >= SUDDEN_DEATH_TURN) {
+    if (!game.suddenDeath) {
+      game.suddenDeath = true;
+      for (const team of game.teams) {
+        for (const w of team.worms) {
+          if (w.alive && w.hp > SUDDEN_DEATH_HP_CAP) w.hp = SUDDEN_DEATH_HP_CAP;
+        }
+      }
+    }
+    // y grows downward: rising water means the surface climbs toward
+    // smaller y, so waterY decreases each turn while sudden death runs.
+    game.terrain.waterY -= SUDDEN_DEATH_WATER_RISE;
+  }
+
+  game.stateTime = 0;
+  game.turnTimer = TURN_SECONDS;
+  game.retreatTimer = 0;
+  game.wind = (Math.random() * 2 - 1) * MAX_WIND;
+  game.shotsLeft = 0;
+  game.chargePower = 0;
+  game.charging = false;
+  game.activeWorm = advanceRoundRobin(game.teams[game.activeTeam]);
+  game.state = STATE.AIMING;
+}
+
+function endTurn(game) {
+  game.turnCount++;
+  const result = checkWinDraw(game.teams);
+  if (result.over) {
+    game.state = STATE.GAME_OVER;
+    game.winner = result.winner;
+    game.draw = result.draw;
+    return;
+  }
+  game.activeTeam = (game.activeTeam + 1) % game.teams.length;
+  startTurn(game);
+}
+
+// ============================================================================
+// AIMING (Req 4.5, 4.6)
+// ============================================================================
+
+const AIM_SPEED = Math.PI * 0.6; // rad/s
+
+// Local aim is kept in [-PI/2 (up), +PI/2 (down)] relative to the worm's
+// facing side; the world-space aimAngle mirrors it when facing is -1 so
+// "up" always stays up and "down" always stays down (Req 4.6).
+function updateAim(worm, input, dt) {
+  if (input.aimUp) worm.localAim -= AIM_SPEED * dt;
+  if (input.aimDown) worm.localAim += AIM_SPEED * dt;
+  worm.localAim = clamp(worm.localAim, -Math.PI / 2, Math.PI / 2);
+  worm.aimAngle = worm.facing === 1 ? worm.localAim : (Math.PI - worm.localAim);
+}
+
+// ============================================================================
+// TOP-LEVEL PER-TICK GAME STEP (state machine transitions, Req 3, 9)
+// ============================================================================
+
+function enterSettling(game) {
+  game.state = STATE.SETTLING;
+  game.settleTimer = 0;
+}
+
+function processDeaths(game, dt) {
+  for (const team of game.teams) {
+    for (const w of team.worms) {
+      if (w.alive && w.hp <= 0 && !w.dying) {
+        w.dying = true;
+        w.deathTimer = DEATH_FUSE_SECONDS;
+      }
+    }
+  }
+  for (const team of game.teams) {
+    for (const w of team.worms) {
+      if (w.dying) {
+        w.deathTimer -= dt;
+        if (w.deathTimer <= 0) {
+          w.dying = false;
+          w.alive = false;
+          explode(game, w.x, w.y, DEATH_EXPLOSION_RADIUS, DEATH_EXPLOSION_DAMAGE);
+          game.graves.push({ x: w.x, y: w.y });
+        }
+      }
+    }
+  }
+  let anyDying = false;
+  for (const team of game.teams) {
+    for (const w of team.worms) {
+      if (w.dying || (w.alive && w.hp <= 0)) anyDying = true;
+    }
+  }
+  return anyDying;
+}
+
+// Req 9.2: after the settle cap, force positions to a sane resting state
+// (snap to ground, or drown) rather than stalling forever.
+function forceSettleAll(game) {
+  for (const team of game.teams) {
+    for (const w of team.worms) {
+      if (!w.alive || w.atRest) continue;
+      w.vx = 0;
+      w.vy = 0;
+      const groundY = game.terrain.heightAt(w.x);
+      w.y = groundY - WORM_RADIUS;
+      w.atRest = true;
+      if (w.y + WORM_RADIUS >= game.terrain.waterY) {
+        w.alive = false;
+        w.drowned = true;
+      }
+    }
+  }
+}
+
+function beginFire(game, worm, kind) {
+  const team = game.teams[game.activeTeam];
+  if (!canSelectWeapon(team, kind)) return false;
+
+  if (kind === 'shotgun') {
+    team.ammo.shotgun--;
+    game.isShotgunTurn = true;
+    game.shotsLeft = WEAPONS.shotgun.shots - 1;
+    game.retreatTimer = 0; // hitscan leaves nothing to retreat from (Req 5.6)
+    fireShotgun(game, worm);
+    game.state = STATE.PROJECTILE;
+    return true;
+  }
+
+  if (kind === 'dynamite') {
+    spawnProjectile(game, 'dynamite', worm, 1, team);
+    game.isShotgunTurn = false;
+    game.retreatTimer = RETREAT_SECONDS;
+    game.state = STATE.PROJECTILE;
+    return true;
+  }
+
+  // Chargeable weapons: bazooka, grenade, cluster.
+  game.state = STATE.CHARGING;
+  game.charging = true;
+  game.chargePower = 0;
+  return true;
+}
+
+function releaseCharge(game, worm) {
+  const team = game.teams[game.activeTeam];
+  const kind = game.selectedWeapon;
+  spawnProjectile(game, kind, worm, Math.max(game.chargePower, 0.05), team);
+  game.charging = false;
+  game.isShotgunTurn = false;
+  game.retreatTimer = RETREAT_SECONDS;
+  game.state = STATE.PROJECTILE;
+}
+
+function stepAiming(game, dt, input) {
+  game.turnTimer -= dt;
+  const worm = game.activeWorm;
+
+  if (worm && worm.alive) {
+    stepWormPhysics(worm, game.terrain, dt, input);
+    updateAim(worm, input, dt);
+    if (input.weaponSelect && canSelectWeapon(game.teams[game.activeTeam], input.weaponSelect)) {
+      game.selectedWeapon = input.weaponSelect;
+    }
+  }
+
+  // Req 3.7: active worm dies during its own turn (self-damage, drowning) ->
+  // end the turn immediately after effects resolve. hp<=0 is the trigger;
+  // the alive flag itself flips later once the death-fuse detonation
+  // (processDeaths, run during SETTLING) actually resolves it.
+  if (worm && (!worm.alive || worm.hp <= 0)) { enterSettling(game); return; }
+
+  if (game.turnTimer <= 0) { enterSettling(game); return; } // Req 3.3 (no charge held)
+
+  if (input.fire && worm && worm.alive) {
+    beginFire(game, worm, game.selectedWeapon);
+  }
+}
+
+function stepCharging(game, dt, input) {
+  game.turnTimer -= dt;
+  game.chargePower = clamp(game.chargePower + dt / CHARGE_SECONDS, 0, 1);
+  const worm = game.activeWorm;
+
+  const timedOut = game.turnTimer <= 0;
+  const released = !input.fireHeld;
+  const full = game.chargePower >= 1;
+
+  if (timedOut || released || full) {
+    releaseCharge(game, worm); // Req 3.3: expiry mid-charge still fires
+  }
+}
+
+function stepProjectilePhase(game, dt, input) {
+  stepProjectiles(game, dt);
+  const worm = game.activeWorm;
+
+  if (game.isShotgunTurn) {
+    game.turnTimer -= dt; // timer keeps running between the two shots (Req 5.6)
+    if (input.fire && game.shotsLeft > 0 && worm && worm.alive) {
+      fireShotgun(game, worm);
+      game.shotsLeft--;
+    }
+    if (game.shotsLeft <= 0 || game.turnTimer <= 0) enterSettling(game);
+    return;
+  }
+
+  if (worm && worm.alive) stepWormPhysics(worm, game.terrain, dt, input); // retreat movement only
+  game.retreatTimer -= dt;
+
+  const shotEffectsResolved = game.projectiles.length === 0;
+  const wormSettled = !worm || !worm.alive || worm.atRest;
+  if ((shotEffectsResolved && wormSettled) || game.retreatTimer <= 0) {
+    enterSettling(game);
+  }
+}
+
+function stepSettlingPhase(game, dt) {
+  stepProjectiles(game, dt);
+  for (const team of game.teams) {
+    for (const w of team.worms) {
+      if (w.alive) stepWormPhysics(w, game.terrain, dt, {});
+    }
+  }
+  const anyDying = processDeaths(game, dt);
+  game.settleTimer = (game.settleTimer || 0) + dt;
+
+  const allSettled = game.projectiles.length === 0 && !anyDying
+    && game.teams.every((t) => t.worms.every((w) => !w.alive || w.atRest));
+
+  if (allSettled || game.settleTimer >= SETTLE_CAP_SECONDS) {
+    if (!allSettled) forceSettleAll(game);
+    endTurn(game);
+  }
+}
+
+function stepGame(game, dt, input = {}) {
+  game.stateTime += dt;
+  switch (game.state) {
+    case STATE.AIMING: stepAiming(game, dt, input); break;
+    case STATE.CHARGING: stepCharging(game, dt, input); break;
+    case STATE.PROJECTILE: stepProjectilePhase(game, dt, input); break;
+    case STATE.SETTLING: stepSettlingPhase(game, dt); break;
+    default: break; // TITLE / GAME_OVER: driven by menu input, not the sim step
+  }
+}
+
+// ============================================================================
 // COMMONJS EXPORT GUARD (inert in the browser; `module` is undefined there)
 // ============================================================================
 if (typeof module !== 'undefined' && module.exports) {
@@ -764,5 +1080,7 @@ if (typeof module !== 'undefined' && module.exports) {
     allWorms, explode,
     WEAPONS, WEAPON_ORDER, canSelectWeapon, spawnProjectile, stepProjectiles,
     fireShotgun,
+    MAX_WIND, createGame, advanceRoundRobin, checkWinDraw, startTurn, endTurn,
+    AIM_SPEED, updateAim, stepGame, processDeaths, enterSettling,
   };
 }
