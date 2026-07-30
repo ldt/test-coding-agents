@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PoolSide S 2.1 · Pool — Worms</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game" width="1600" height="900" aria-hidden="true"></canvas>
+
+  <!-- Overlays / HUD (system fonts only, styled in style.css) -->
+  <div id="titleScreen" class="overlay">
+    <h1 class="gameTitle">WORMS</h1>
+    <p class="tagline">PoolSide S 2.1 · Pool</p>
+    <div class="modeButtons">
+      <button id="btn2p" data-mode="pvp">2 Players</button>
+      <button id="btnCpu" data-mode="cpu">vs CPU</button>
+    </div>
+    <div class="controlsSummary">
+      <kbd>← →</kbd> Walk &nbsp; <kbd>↑ ↓</kbd> Aim &nbsp; <kbd>Enter / Z</kbd> Jump &nbsp;
+      <kbd>Space</kbd> Fire (hold to charge) &nbsp; <kbd>1-5</kbd> Weapons
+    </div>
+  </div>
+
+  <div id="victoryScreen" class="overlay hidden">
+    <h1 id="victoryMessage">Team Red wins</h1>
+    <button id="btnRematch">Rematch</button>
+  </div>
+
+  <div id="hud" class="hud">
+    <div id="hudLeft">
+      <span id="wind">Wind: —</span>
+      <span id="turnTimer">45</span>s
+    </div>
+    <div id="hudCenter">
+      <span id="suddenDeath" class="hidden">SUDDEN DEATH</span>
+    </div>
+    <div id="hudRight">
+      <div id="weaponPanel"></div>
+      <div id="turnInfo"></div>
+      <div id="teamBars"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

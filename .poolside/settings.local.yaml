@@ -1,0 +1,21 @@
+tools:
+    shell:
+        allow:
+            - ls *
+            - echo *
+            - pwd
+            - mkdir *
+            - cd *
+            - npm install
+            - tail *
+            - cat *
+            - head *
+            - git log *
+            - git branch *
+            - git config *
+            - env
+            - grep *
+            - node *
+            - npx playwright test *
+            - npm install *
+            - npx playwright *

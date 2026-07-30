@@ -1,0 +1,104 @@
+/* ---- Worms: presentation (system fonts only, no external assets) ---- */
+:root {
+  --bg: #0e1a2a;
+  --panel: rgba(10, 18, 30, 0.82);
+  --text: #f0f4fb;
+  --muted: #a8b3c7;
+  --red: #ff5a5a;
+  --blue: #5ac3ff;
+  --gold: #ffdf5a;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  touch-action: none;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  /* integer-ish scaling keeps the pixel art readable */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  /* never letterboxed */
+  object-fit: contain;
+  background: #0b1220;
+}
+
+/* ---- HUD ---- */
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 14px;
+  pointer-events: none;
+  z-index: 2;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0,0,0,.8);
+}
+.hud > div { pointer-events: none; }
+
+#wind { color: var(--muted); }
+#turnTimer { color: var(--gold); font-weight: 700; }
+#turnTimer.low { color: var(--red); }
+#suddenDeath { color: var(--red); font-weight: 800; letter-spacing: .08em; }
+
+#teamBars { display: flex; gap: 10px; align-items: center; }
+.bar { width: 90px; height: 14px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.25); border-radius: 3px; overflow: hidden; }
+.bar span { display:block; height:100%; }
+.teamRed .bar span { background: var(--red); }
+.teamBlue .bar span { background: var(--blue); }
+.wormCount { font-size: 12px; color: var(--muted); }
+
+#weaponPanel { display: flex; gap: 6px; flex-wrap: wrap; }
+.weapon { padding: 2px 6px; border-radius: 3px; border: 1px solid transparent; cursor: pointer; }
+.weapon.sel { border-color: var(--gold); background: rgba(255,223,80,.15); }
+.weapon.dep { opacity: .35; cursor: not-allowed; }
+.weapon .ammo { font-size: 11px; color: var(--muted); }
+
+/* ---- Overlays ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(8, 14, 24, 0.88);
+  z-index: 3;
+  pointer-events: auto;
+}
+.overlay.hidden { display: none; }
+.overlay h1 { margin: 0; font-size: 42px; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+.gameTitle { letter-spacing: .06em; }
+.tagline { color: var(--muted); font-size: 16px; }
+.modeButtons button, #victoryScreen button {
+  font: inherit; font-size: 18px; padding: 10px 22px; border: 2px solid var(--blue);
+  border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer;
+}
+.modeButtons button:hover, #victoryScreen button:hover {
+  background: var(--blue); color: #0b1220; font-weight: 700;
+}
+.controlsSummary { color: var(--muted); font-size: 13px; max-width: 520px; text-align: center; line-height: 1.4; }
+.controlsSummary kbd { background: #1e2a3a; padding: 2px 7px; border-radius: 3px; border: 1px solid #2e415c; }
+
+#victoryMessage { color: #fff; }
+
+/* responsive: keep everything readable on small windows */
+@media (max-width: 700px) {
+  .hud { font-size: 11px; padding: 4px; gap: 4px; }
+  .overlay h1 { font-size: 28px; }
+  .modeButtons button { font-size: 15px; padding: 8px 16px; }
+}
