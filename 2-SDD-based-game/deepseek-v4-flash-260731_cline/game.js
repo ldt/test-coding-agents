@@ -354,18 +354,26 @@ function thisSolid(game, x, y) {
   return false;
 }
 
+// Jump (Enter/Z) — forward arc jump (Req 4.3). Triggered independently of
+// movement input so the worm jumps as soon as the key is pressed, even if
+// no direction key is held.
+function tryJump(game, worm) {
+  if (!game.wantJump) return false;
+  if (worm !== game.activeWorm()) return false;
+  if (!worm.alive || worm.dying || worm.trulyDead || !worm.atRest) return false;
+  worm.vx = worm.facing * JUMP_VX;
+  worm.vy = JUMP_VY;
+  worm.atRest = false;
+  worm.fallStartY = worm.y;
+  game.wantJump = false;
+  worm.jumpCooldown = 0.25;
+  return true;
+}
+
 function moveWorm(game, worm, dt, inputFacing) {
   if (!worm.alive || worm.dying || worm.trulyDead) return;
 
-  // Jump (Enter/Z) — forward arc jump (Req 4.3)
-  if (game.wantJump && worm === game.activeWorm() && worm.atRest) {
-    worm.vx = worm.facing * JUMP_VX;
-    worm.vy = JUMP_VY;
-    worm.atRest = false;
-    worm.fallStartY = worm.y;
-    game.wantJump = false;
-    worm.jumpCooldown = 0.25;
-  }
+  tryJump(game, worm);
   if (worm.jumpCooldown > 0) worm.jumpCooldown -= dt;
   if (!worm.atRest) {
     integrateWorm(game, worm, dt);
@@ -1128,6 +1136,10 @@ function updateAiming(game, dt) {
     return;
   }
 
+  // Human: jump (Enter/Z) triggers on the key press itself, independent of
+  // any movement key (Req 4.3).
+  tryJump(game, worm);
+
   // Human: movement (Req 4.1, 4.2)
   const left = keys['ArrowLeft'], right = keys['ArrowRight'];
   let dir = 0;
@@ -1211,13 +1223,7 @@ function updateRetreat(game, dt) {
     const left = keys['ArrowLeft'], right = keys['ArrowRight'];
     const dir = left ? -1 : right ? 1 : 0;
     if (dir) moveWorm(game, worm, dt, dir);
-    if (game.wantJump) {
-      worm.vx = worm.facing * JUMP_VX;
-      worm.vy = JUMP_VY;
-      worm.atRest = false;
-      worm.fallStartY = worm.y;
-      game.wantJump = false;
-    }
+    if (game.wantJump) tryJump(game, worm);
   }
 
   const projectilesDone = game.projectiles.length === 0;

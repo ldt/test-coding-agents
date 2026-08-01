@@ -64,7 +64,7 @@ Non-negotiable constraints for the implementing agent:
 
 1. WHEN the left/right arrow keys are held THEN the active worm SHALL walk in that direction, following terrain slopes it can climb, and SHALL face that direction.
 2. IF a slope or wall is too steep to climb THEN the worm SHALL stop rather than pass through terrain.
-3. WHEN the jump key (Enter or Z) is pressed THEN the active worm SHALL perform a small forward arc jump affected by gravity.
+3. WHEN the jump key (Enter or Z) is pressed THEN the active worm SHALL perform a small forward arc jump affected by gravity, fired the moment the key is pressed and independent of any movement key: the worm SHALL jump even if no left/right key is held (the jump must NOT be deferred until the worm starts moving laterally).
 4. WHEN a worm walks off an edge or is airborne THEN gravity SHALL apply until it lands; WHEN it falls farther than a safe threshold THEN it SHALL take fall damage proportional to the excess fall distance.
 5. WHEN the up/down arrow keys are held THEN the system SHALL rotate the aim angle smoothly through at least 180° in the facing direction, rendering a visible aim indicator (crosshair or arrow).
 6. WHEN the facing direction flips THEN the aim angle SHALL mirror to the new facing side.

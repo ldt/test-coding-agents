@@ -107,7 +107,7 @@ Web Audio API only — oscillators and generated noise buffers, no files, so the
 
 ### Input
 
-Single `keydown`/`keyup` map feeding a `keys` set; all game reactions read the set inside the fixed step (no logic in event handlers except `preventDefault` for arrows/space). Every handler routes through the state machine's `allowedInputs(state)` filter (Reqs 3.6, 9.3).
+Single `keydown`/`keyup` map feeding a `keys` set; all game reactions read the set inside the fixed step (no logic in event handlers except `preventDefault` for arrows/space). Every handler routes through the state machine's `allowedInputs(state)` filter (Reqs 3.6, 9.3). The jump key (Enter/Z) is a strict edge trigger (`wantJump` latch, cleared in `tryJump`); jump resolution lives outside the movement path so the worm jumps the instant the key is pressed, even with no direction key held (Req 4.3).
 
 ### Rendering
 
