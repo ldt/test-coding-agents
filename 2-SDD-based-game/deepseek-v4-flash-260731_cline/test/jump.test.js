@@ -1,17 +1,22 @@
 // TDD regression test for the jump bug (Req 4.3).
 //
-// Red (bug): the jump key (Enter/Z) is consumed only inside moveWorm(),
-// which is called only when a direction key is held. Pressing Enter/Z while
-// standing still therefore does nothing — the worm only jumps after it has
-// started moving laterally.
+// Red (bug v1): the jump key (Enter/Z) was consumed only inside moveWorm(),
+// which runs only when a direction key is held — pressing Enter/Z standing
+// still did nothing.
 //
-// Green (fix): pressing Enter/Z alone must start the forward arc jump
-// (vy = JUMP_VY, forward vx = facing * JUMP_VX) with no direction key
-// pressed.
+// Red (bug v2): tryJump() marked the worm airborne, but the worm's physics
+// integration happens inside moveWorm(), which still only ran when a
+// direction key was held. So after a standing jump the worm was flagged
+// airborne but never moved — it hovered frozen until a direction key was
+// pressed. A test that only checked atRest was a false positive.
 //
-// Drives index.html in pvp mode headless (human input is honored in pvp;
-// demo mode is CPU-vs-CPU and ignores keys), presses Enter with no arrow
-// key, and asserts the active worm leaves the ground.
+// Green (fix): the active worm's physics must be stepped every AIMING frame
+// even with no direction key, so a standing jump actually leaves the ground
+// and arcs forward.
+//
+// This test is strict: it asserts REAL displacement (the worm's y drops by
+// a substantial amount and x moves in the facing direction) ~300ms after a
+// bare Enter press with no arrow keys.
 const { chromium } = require('playwright');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -40,18 +45,43 @@ const GAME_URL = pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
       return w && w.alive && w.atRest && !w.trulyDead && !w.dying;
     }, null, { timeout: 15000 });
 
+    // Teleport the active worm onto a known flat, open plateau so the jump
+    // test is independent of random spawn/wall geometry. This isolates the
+    // exact bug: physics not stepping when no direction key is held.
     const before = await page.evaluate(() => {
       const g = window.__game;
+      const W = 1600;
       const t = g.teams[g.activeTeam];
       const w = t.worms[t.activeWormIx];
-      return { x: w.x, y: w.y, vy: w.vy, atRest: w.atRest, id: w.id };
+      // find the widest flat run on the terrain to stand on
+      const terrain = g.terrain;
+      let bestX = 400, bestRun = 0;
+      for (let x = 100; x < W - 100;) {
+        let run = 0;
+        while (x + run < W - 100 &&
+               Math.abs(terrain.surfaceHeight(x + run) - terrain.surfaceHeight(x)) <= 2) run += 4;
+        if (run > bestRun) { bestRun = run; bestX = x + Math.floor(run / 2); }
+        x = x + Math.max(4, run);
+      }
+      const sy = terrain.surfaceHeight(bestX);
+      w.x = bestX;
+      w.y = sy - 15; // center = surfaceHeight - WORM_R(14) - 1
+      w.vx = 0; w.vy = 0;
+      w.atRest = true;
+      w.facing = 1; // jump forward to the right over open ground
+      w.fallStartY = w.y;
+      return { x: w.x, y: w.y, vy: w.vy, atRest: w.atRest, id: w.id, facing: w.facing };
     });
 
     // Press ONLY the jump key — no arrow keys.
     await page.keyboard.press('Enter');
 
-    // Give the fixed-step loop a few frames to apply the jump.
-    await page.waitForTimeout(500);
+    // Sample at ~120ms: the jump must already be physically lifting
+    // (vy = -420 + g*t => strongly negative, y risen ~40px) and still
+    // climbing, BEFORE any landing masks the result. Before the fix, the
+    // worm was flagged airborne with vy=-420 yet its position never changed
+    // (physics only stepped inside the movement path).
+    await page.waitForTimeout(120);
 
     const after = await page.evaluate(() => {
       const g = window.__game;
@@ -63,23 +93,24 @@ const GAME_URL = pathToFileURL(path.join(__dirname, '..', 'index.html')).href;
     // The same worm must still be active (turn didn't flip mid-check).
     assert(after.id === before.id, 'active worm changed during the test');
 
-    // The worm must have left the ground: risen above its starting y and
-    // gained upward velocity, WITHOUT any lateral key pressed.
+    // The worm must have REALLY jumped: risen substantially (physics ran)
+    // and still moving upward, WITHOUT any lateral key.
     assert(
-      after.atRest === false || after.y < before.y - 5 || after.vy < -100,
-      'worm did not jump when Enter was pressed standing still ' +
+      after.y < before.y - 15 && after.vy < 0,
+      'worm did not physically jump on a bare Enter press ' +
       '(before=' + JSON.stringify(before) + ' after=' + JSON.stringify(after) + ')'
     );
-    // The jump must be a forward arc: airborne AND horizontally displaced in
-    // the facing direction.
-    const movedForward = Math.abs(after.x - before.x) > 5;
+    // The jump is a forward arc in the facing direction (vx = facing * 160;
+    // ~19px expected at 120ms on open ground).
+    const movedForward = (after.x - before.x) * before.facing > 5;
     assert(
-      movedForward || !after.atRest,
-      'jump did not produce a forward arc')
-    ;
+      movedForward,
+      'jump did not produce a forward arc in the facing direction ' +
+      '(before=' + JSON.stringify(before) + ' after=' + JSON.stringify(after) + ')'
+    );
 
     assert(errors.length === 0, 'no console errors: ' + errors.join(' | '));
-    console.log('PASS jump: Enter alone starts a forward arc jump');
+    console.log('PASS jump: bare Enter press physically launches a forward arc jump');
     await page.close();
   } catch (e) {
     console.error('FAIL: ' + e.message);

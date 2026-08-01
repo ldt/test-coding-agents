@@ -1154,6 +1154,11 @@ function updateAiming(game, dt) {
       else worm.aimAngle = Math.PI - worm.aimAngle;
       worm.aimAngle = clamp(worm.aimAngle, -Math.PI * 0.95, Math.PI * 0.95);
     }
+  } else if (!worm.atRest) {
+    // Airborne (e.g. just jumped, or the ground vanished beneath it): step
+    // physics every frame even with no direction key held, so a standing
+    // jump actually arcs through the air (Req 4.3, 4.4).
+    moveWorm(game, worm, dt, 0);
   }
   // Aim (Req 4.5)
   if (keys['ArrowUp']) worm.aimAngle = clamp(worm.aimAngle - dt * 2.2, -Math.PI * 0.95, -0.02);
