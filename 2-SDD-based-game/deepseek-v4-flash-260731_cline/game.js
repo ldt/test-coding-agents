@@ -825,13 +825,12 @@ function startMatch(game, mode) {
   game.camera = { shakeT: 0, shakeMag: 0 };
   game.teams = [
     { name: 'Team Blue', color: '#3b9cff', isCpu: mode === 'cpu' || mode === 'demo',
-      worms: [], ammo: { cluster: 3, shotgun: 3, dynamite: 2 } },
+      worms: [], ammo: { cluster: 3, shotgun: 3, dynamite: 2 }, activeWormIx: -1 },
     { name: 'Team Red', color: '#ff5a5a', isCpu: mode === 'demo',
-      worms: [], ammo: { cluster: 3, shotgun: 3, dynamite: 2 } },
+      worms: [], ammo: { cluster: 3, shotgun: 3, dynamite: 2 }, activeWormIx: -1 },
   ];
   game.firstTeam = mode === 'cpu' ? 0 : (Math.random() < 0.5 ? 0 : 1);
   game.activeTeam = game.firstTeam;
-  game.activeWormIx = 0;
   game.wind = 0;
   game.turnTimer = TURN_TIME;
   game.retreatTimer = 0;
@@ -853,6 +852,7 @@ function startMatch(game, mode) {
   game.terrain.generate(Math.floor(Math.random() * 1e9));
   game.waterY = game.terrain.waterY;
   placeWorms(game);
+  advanceCursor(game, game.teams[game.activeTeam]);
   game.state = S.TURN_START;
   game.stateTime = 0;
 }
@@ -924,7 +924,7 @@ function placeWorms(game) {
 function activeWorm(game) {
   const team = game.teams[game.activeTeam];
   if (!team || !team.worms) return null;
-  return team.worms[game.activeWormIx];
+  return team.worms[team.activeWormIx];
 }
 
 function advanceCursor(game, team) {
@@ -932,8 +932,8 @@ function advanceCursor(game, team) {
   const n = worms.length;
   if (n === 0) return false;
   for (let i = 0; i < n; i++) {
-    game.activeWormIx = (game.activeWormIx + 1) % n;
-    const w = worms[game.activeWormIx];
+    team.activeWormIx = (team.activeWormIx + 1) % n;
+    const w = worms[team.activeWormIx];
     if (w.alive && !w.trulyDead && !w.dying) return true;
   }
   return false;
@@ -983,7 +983,6 @@ function endTurn(game) {
   checkEnd(game);
   if (game.state === S.GAME_OVER) return;
   game.activeTeam = 1 - game.activeTeam;
-  game.activeWormIx = -1;
   advanceCursor(game, game.teams[game.activeTeam]);
   game.turnCount++;
   game.turnTimer = TURN_TIME;
@@ -1026,7 +1025,6 @@ function createGame() {
     mode: null,
     teams: [],
     activeTeam: 0,
-    activeWormIx: 0,
     turnTimer: TURN_TIME,
     retreatTimer: 0,
     wind: 0,
