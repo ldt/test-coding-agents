@@ -211,14 +211,18 @@ class Terrain {
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
     ctx.restore();
-    // dark rim ring on the remaining terrain
+    // Dark rim ring on the remaining terrain (Req 2.5). Must never create
+    // new solid pixels: painted with 'source-atop' so it only darkens pixels
+    // that already have terrain alpha, and leaves the carved interior and
+    // any air above the surface transparent. Crater areas therefore stay
+    // passable air for worms and projectiles (Req 2.3).
     ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.arc(x, y, r + 2, 0, TAU, true);
-    ctx.clip();
+    ctx.arc(x, y, r - 3, 0, TAU);
+    ctx.arc(x, y, r + 3, 0, TAU, true);
     ctx.fillStyle = 'rgba(50,30,20,0.55)';
-    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.fill();
     ctx.restore();
     this.rebuildAlpha(rect);
   }

@@ -39,7 +39,8 @@ Non-negotiable constraints for the implementing agent:
 3. WHEN terrain is removed THEN the system SHALL treat the removed area as passable air for all subsequent movement, projectile, and collision queries.
 4. WHEN a worm stands on terrain that is destroyed beneath it THEN the worm SHALL fall under gravity until it lands on remaining terrain or reaches water.
 5. WHEN terrain is rendered THEN the system SHALL visually distinguish a grass/surface top edge from the dirt body, and carved craters SHALL show a darkened rim.
-6. IF the bottom of the playfield is reached THEN the system SHALL present water: any worm entering it dies instantly (Requirement 6.5).
+6. IF the crater rim is visually darkened THEN the darkening SHALL be applied only to terrain pixels that already exist (the rim must be "clipped to remaining terrain"): it SHALL NOT create new solid pixels out of thin air or re-solidify any portion of the carved interior. The carved interior and the air above the surface around the blast point SHALL remain fully passable after the rim is drawn (this guarantees Requirement 2.3 — in particular, subsequent projectiles must be able to fly through a crater and worms must be able to walk into it).
+7. IF the bottom of the playfield is reached THEN the system SHALL present water: any worm entering it dies instantly (Requirement 6.5).
 
 ### Requirement 3: Turn system
 
