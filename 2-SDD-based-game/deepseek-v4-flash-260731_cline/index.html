@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worms</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-top">
+      <div class="team-panel" id="team-panel-0">
+        <span class="team-name">Team 1</span>
+        <div class="team-bar-track"><div class="team-bar" id="team-bar-0"></div></div>
+        <span class="team-hp" id="team-hp-0">400</span>
+      </div>
+      <div id="hud-center">
+        <div id="turn-timer">45</div>
+        <div id="wind-indicator" title="Wind">
+          <span id="wind-value">0</span>
+          <svg id="wind-arrow" width="24" height="18" viewBox="0 0 24 18">
+            <line x1="12" y1="9" x2="20" y2="9" stroke="white" stroke-width="2"/>
+            <polygon points="20,9 15,5 15,13" fill="white"/>
+          </svg>
+        </div>
+        <div id="sudden-death" class="hidden">☠ SUDDEN DEATH ☠</div>
+      </div>
+      <div class="team-panel team-panel-right" id="team-panel-1">
+        <span class="team-name">Team 2</span>
+        <div class="team-bar-track"><div class="team-bar" id="team-bar-1"></div></div>
+        <span class="team-hp" id="team-hp-1">400</span>
+      </div>
+    </div>
+    <div id="weapon-panel"></div>
+    <div id="power-gauge" class="hidden"><div id="power-fill"></div></div>
+  </div>
+
+  <!-- Title screen -->
+  <div id="title-screen" class="overlay">
+    <h1>WORMS</h1>
+    <p id="subtitle">A turn-based artillery duel</p>
+    <button id="btn-pvp" class="menu-btn">2 Players</button>
+    <button id="btn-cpu" class="menu-btn">vs CPU</button>
+    <div id="controls-summary">
+      <div class="ctrl"><span>← →</span> walk</div>
+      <div class="ctrl"><span>↑ ↓</span> aim</div>
+      <div class="ctrl"><span>Space</span> charge / fire</div>
+      <div class="ctrl"><span>1-5</span> select weapon</div>
+      <div class="ctrl"><span>Enter / Z</span> jump</div>
+    </div>
+  </div>
+
+  <!-- Victory / draw screen -->
+  <div id="victory-screen" class="overlay hidden">
+    <h2 id="victory-title">Victory!</h2>
+    <p id="victory-subtitle"></p>
+    <button id="btn-rematch" class="menu-btn">Rematch</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
