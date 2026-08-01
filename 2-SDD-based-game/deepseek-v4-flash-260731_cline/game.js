@@ -214,8 +214,8 @@ class Terrain {
     // dark rim ring on the remaining terrain
     ctx.save();
     ctx.beginPath();
-    ctx.arc(x, y, r - 3, 0, TAU);
-    ctx.arc(x, y, r + 1, 0, TAU, true);
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.arc(x, y, r + 2, 0, TAU, true);
     ctx.clip();
     ctx.fillStyle = 'rgba(50,30,20,0.55)';
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
