@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wormfall — Turn-Based Artillery</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1600" height="900"></canvas>
+
+  <div id="hud">
+    <div id="topbar">
+      <div class="team-panel" id="panelA">
+        <div class="team-name"></div>
+        <div class="team-health"><div class="team-health-fill"></div></div>
+        <div class="team-worms"></div>
+      </div>
+      <div id="centerbar">
+        <div id="timer">45</div>
+        <div id="windbox" title="Wind">
+          <span id="windarrow">→</span>
+          <div id="windmeter"><div id="windfill"></div></div>
+        </div>
+        <div id="sudden" class="hidden">SUDDEN DEATH</div>
+      </div>
+      <div class="team-panel right" id="panelB">
+        <div class="team-name"></div>
+        <div class="team-health"><div class="team-health-fill"></div></div>
+        <div class="team-worms"></div>
+      </div>
+    </div>
+
+    <div id="banner" class="hidden"></div>
+
+    <div id="bottombar">
+      <div id="powerwrap" class="hidden"><div id="powerfill"></div></div>
+      <div id="weapons"></div>
+    </div>
+  </div>
+
+  <div id="title" class="overlay">
+    <h1>WORMFALL</h1>
+    <p class="tagline">Turn-based artillery on fully destructible ground</p>
+    <div class="menu">
+      <button id="btn2p">2 Players</button>
+      <button id="btncpu">vs CPU</button>
+    </div>
+    <div class="controls">
+      <div><kbd>←</kbd><kbd>→</kbd> walk &nbsp; <kbd>↑</kbd><kbd>↓</kbd> aim &nbsp; <kbd>Enter</kbd>/<kbd>Z</kbd> jump</div>
+      <div><kbd>Space</kbd> hold to charge, release to fire &nbsp; <kbd>1</kbd>–<kbd>5</kbd> weapons</div>
+      <div>Wind bends bazooka shells. Water drowns. Last team standing wins.</div>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay hidden">
+    <h1 id="resulttext"></h1>
+    <div class="menu"><button id="btnrematch">Rematch</button></div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
